@@ -6,6 +6,7 @@ import { logger } from './config/logger';
 import { checkDatabaseConnection, prisma } from './database/prisma';
 import { socketAuthMiddleware } from './sockets/socketAuth';
 import { registerSocketHandlers } from './sockets/gameSocket';
+import { dynamicCorsOptions } from './config/cors';
 
 export async function bootstrap() {
   await checkDatabaseConnection();
@@ -15,9 +16,8 @@ export async function bootstrap() {
 
   const io = new SocketIOServer(server, {
     cors: {
-      origin: env.CORS_ORIGIN,
+      ...dynamicCorsOptions,
       methods: ['GET', 'POST'],
-      credentials: true,
     },
     pingInterval: 10000,
     pingTimeout: 5000,

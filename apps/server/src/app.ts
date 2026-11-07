@@ -13,18 +13,14 @@ import matchmakingRoutes from './modules/matchmaking/matchmaking.routes';
 import aiRoutes from './modules/ai/ai.routes';
 import leaderboardRoutes from './modules/ratings/leaderboard.routes';
 import adminRoutes from './modules/admin/admin.routes';
+import { dynamicCorsOptions } from './config/cors';
 
 export function createApp(): Express {
   const app = express();
 
   // Security & utility middleware
-  app.use(helmet());
-  app.use(
-    cors({
-      origin: env.CORS_ORIGIN,
-      credentials: true,
-    })
-  );
+  app.use(helmet({ crossOriginResourcePolicy: false }));
+  app.use(cors(dynamicCorsOptions));
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use(requestLogger);

@@ -1,8 +1,8 @@
 # Design & Engineering Standards for Online Chess
 
 This repository has adopted:
-1. The design engineering skills by Jakub Krehel (installed under `.agents/skills/` and `skills/`).
-2. **Anthropic's `frontend-design` skill** (installed under `.agents/skills/frontend-design/` and `skills/frontend-design/`), governing intentional, distinctive aesthetic direction that avoids generic "AI slop" or templated defaults.
+1. The design engineering skills by Jakub Krehel (installed under `.agents/skills/`).
+2. **Anthropic's `frontend-design` skill** (installed under `.agents/skills/frontend-design/`), governing intentional, distinctive aesthetic direction that avoids generic "AI slop" or templated defaults.
 
 All frontend interfaces in `apps/web` must adhere to these combined design and craft principles:
 

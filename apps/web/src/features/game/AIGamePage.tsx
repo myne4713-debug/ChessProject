@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Chessboard } from 'react-chessboard';
 import { Chess, Square } from 'chess.js';
 import confetti from 'canvas-confetti';
@@ -131,6 +132,7 @@ export function PieceSvg({
 }
 
 export default function AIGamePage() {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
 
   // Game Setup Configuration
@@ -297,6 +299,26 @@ export default function AIGamePage() {
       </div>
     );
   };
+
+  // Handle exiting game creation or closing setup modal
+  const handleExitCreation = useCallback(() => {
+    if (gameState) {
+      setShowConfigModal(false);
+    } else {
+      navigate('/lobby');
+    }
+  }, [gameState, navigate]);
+
+  // Handle ESC key to dismiss modal or exit
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && (showConfigModal || !gameState)) {
+        handleExitCreation();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showConfigModal, gameState, handleExitCreation]);
 
   // Initialize or Restart Game
   const handleStartGame = async () => {
@@ -773,10 +795,20 @@ export default function AIGamePage() {
 
           <button
             onClick={() => setShowConfigModal(true)}
-            className="px-3.5 py-1.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-sky-500/20 transition-all flex items-center gap-1.5 active:scale-95"
+            className="px-3.5 py-1.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-sky-500/20 transition-all flex items-center gap-1.5 active:scale-[0.96]"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             Ván mới
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/lobby')}
+            aria-label="Rời ván đấu và về sảnh"
+            className="px-3 py-1.5 text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>Rời ván</span>
           </button>
         </div>
       </div>
@@ -1138,16 +1170,23 @@ export default function AIGamePage() {
 
       {/* Setup New Game Modal (Thân thiện, ấm áp) */}
       {(showConfigModal || !gameState) && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-lg p-6 md:p-8 shadow-2xl relative animate-in fade-in zoom-in duration-150 border border-slate-100">
-            {gameState && (
-              <button
-                onClick={() => setShowConfigModal(false)}
-                className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+        <div
+          onClick={handleExitCreation}
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl w-full max-w-lg p-6 md:p-8 shadow-2xl relative animate-in fade-in zoom-in duration-150 border border-slate-100 cursor-default"
+          >
+            <button
+              type="button"
+              onClick={handleExitCreation}
+              aria-label={gameState ? 'Đóng bảng thiết lập ván đấu' : 'Thoát khỏi trang tạo ván đấu'}
+              title={gameState ? 'Đóng bảng' : 'Thoát về sảnh'}
+              className="absolute top-5 right-5 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors duration-150 active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none"
+            >
+              <X className="w-5 h-5 text-slate-500 hover:text-slate-800" />
+            </button>
 
             <div className="flex items-center gap-3.5 mb-6">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center shadow-sm text-white">
@@ -1281,10 +1320,18 @@ export default function AIGamePage() {
                 </div>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 flex items-center gap-3">
                 <button
+                  type="button"
+                  onClick={handleExitCreation}
+                  className="py-3.5 px-5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-2xl transition-all duration-150 text-sm active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none"
+                >
+                  {gameState ? 'Hủy bỏ' : 'Hủy & Về sảnh'}
+                </button>
+                <button
+                  type="button"
                   onClick={handleStartGame}
-                  className="w-full py-3.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold rounded-2xl shadow-sm shadow-sky-500/25 transition-all flex items-center justify-center gap-2 text-sm active:scale-[0.99]"
+                  className="flex-1 py-3.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold rounded-2xl shadow-sm shadow-sky-500/25 transition-all duration-150 flex items-center justify-center gap-2 text-sm active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none"
                 >
                   <Play className="w-4 h-4 fill-white" />
                   Bắt Đầu Chơi Ngay

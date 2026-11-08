@@ -75,8 +75,29 @@ export default function GamePage() {
     color: 'w' | 'b';
   } | null>(null);
 
-  const chatBottomRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const moveHistoryContainerRef = useRef<HTMLDivElement>(null);
   const localChessRef = useRef(new Chess());
+  const gameStateRef = useRef<GameState | null>(null);
+  gameStateRef.current = gameState;
+
+  const lastSyncRef = useRef<{
+    whiteMs: number;
+    blackMs: number;
+    turn: 'w' | 'b';
+    timestamp: number;
+  } | null>(null);
+
+  const syncClocks = (whiteMs: number, blackMs: number, turn: 'w' | 'b') => {
+    lastSyncRef.current = {
+      whiteMs,
+      blackMs,
+      turn,
+      timestamp: Date.now(),
+    };
+    setWhiteClockMs(whiteMs);
+    setBlackClockMs(blackMs);
+  };
 
   // Determine user's assigned color
   const isWhitePlayer = gameState?.whitePlayerId === user?.id;
@@ -181,8 +202,11 @@ export default function GamePage() {
         setGameState(res.data.state);
         setBoardFen(res.data.state.currentFen);
         localChessRef.current = new Chess(res.data.state.currentFen);
-        setWhiteClockMs(res.data.state.whiteRemainingMs);
-        setBlackClockMs(res.data.state.blackRemainingMs);
+        syncClocks(
+          res.data.state.whiteRemainingMs,
+          res.data.state.blackRemainingMs,
+          res.data.state.currentTurn
+        );
         if (res.data.messages) {
           setChatMessages(res.data.messages);
         }
@@ -192,8 +216,7 @@ export default function GamePage() {
     const handleMoveResult = (payload: MoveResultPayload) => {
       setBoardFen(payload.fen);
       localChessRef.current = new Chess(payload.fen);
-      setWhiteClockMs(payload.whiteRemainingMs);
-      setBlackClockMs(payload.blackRemainingMs);
+      syncClocks(payload.whiteRemainingMs, payload.blackRemainingMs, payload.currentTurn);
       setLastMoveSquares({ from: payload.move.fromSquare, to: payload.move.toSquare });
 
       if (payload.isGameOver) {
@@ -220,6 +243,20 @@ export default function GamePage() {
     };
 
     const handleClockSync = (payload: ClockUpdatePayload) => {
+      const currentTurn = gameStateRef.current?.currentTurn || 'w';
+      if (lastSyncRef.current) {
+        lastSyncRef.current.whiteMs = payload.whiteRemainingMs;
+        lastSyncRef.current.blackMs = payload.blackRemainingMs;
+        lastSyncRef.current.turn = currentTurn;
+        lastSyncRef.current.timestamp = Date.now();
+      } else {
+        lastSyncRef.current = {
+          whiteMs: payload.whiteRemainingMs,
+          blackMs: payload.blackRemainingMs,
+          turn: currentTurn,
+          timestamp: Date.now(),
+        };
+      }
       setWhiteClockMs(payload.whiteRemainingMs);
       setBlackClockMs(payload.blackRemainingMs);
     };
@@ -242,9 +279,10 @@ export default function GamePage() {
 
     const handleError = () => {
       // Revert optimistic move on socket rejection
-      if (gameState) {
-        setBoardFen(gameState.currentFen);
-        localChessRef.current = new Chess(gameState.currentFen);
+      const current = gameStateRef.current;
+      if (current) {
+        setBoardFen(current.currentFen);
+        localChessRef.current = new Chess(current.currentFen);
       }
     };
 
@@ -263,39 +301,48 @@ export default function GamePage() {
       socket.off(SOCKET_EVENTS.DRAW_OFFERED, handleDrawOffered);
       socket.off(SOCKET_EVENTS.ERROR, handleError);
     };
-  }, [gameId, isWaitingRoom, socket, user, gameState]);
+  }, [gameId, isWaitingRoom, socket, user?.id]);
 
-  // Local clock tick when in progress
+  // Smooth clock countdown without jitter or double-counting
   useEffect(() => {
     if (!gameState || gameState.status !== 'IN_PROGRESS' || gameOverData) return;
 
     const interval = setInterval(() => {
-      if (gameState.currentTurn === 'w') {
-        setWhiteClockMs((prev) => {
-          const next = Math.max(0, prev - 1000);
-          if (next <= 0 && isPlayer) {
-            socket.emit(SOCKET_EVENTS.CLAIM_TIMEOUT, { gameId });
-          }
-          return next;
-        });
+      if (!lastSyncRef.current) return;
+      const { whiteMs, blackMs, turn, timestamp } = lastSyncRef.current;
+      const elapsed = Date.now() - timestamp;
+
+      if (turn === 'w') {
+        const remaining = Math.max(0, whiteMs - elapsed);
+        setWhiteClockMs(remaining);
+        if (remaining <= 0 && isPlayer) {
+          socket.emit(SOCKET_EVENTS.CLAIM_TIMEOUT, { gameId });
+        }
       } else {
-        setBlackClockMs((prev) => {
-          const next = Math.max(0, prev - 1000);
-          if (next <= 0 && isPlayer) {
-            socket.emit(SOCKET_EVENTS.CLAIM_TIMEOUT, { gameId });
-          }
-          return next;
-        });
+        const remaining = Math.max(0, blackMs - elapsed);
+        setBlackClockMs(remaining);
+        if (remaining <= 0 && isPlayer) {
+          socket.emit(SOCKET_EVENTS.CLAIM_TIMEOUT, { gameId });
+        }
       }
-    }, 1000);
+    }, 250);
 
     return () => clearInterval(interval);
-  }, [gameState?.currentTurn, gameState?.status, gameOverData, isPlayer, gameId, socket]);
+  }, [gameState?.status, gameOverData, isPlayer, gameId, socket]);
 
-  // Scroll chat to bottom
+  // Auto-scroll chat internally to bottom without scrolling window
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [chatMessages]);
+
+  // Auto-scroll move history container internally
+  useEffect(() => {
+    if (moveHistoryContainerRef.current) {
+      moveHistoryContainerRef.current.scrollTop = moveHistoryContainerRef.current.scrollHeight;
+    }
+  }, [gameState?.moves?.length]);
 
   const dispatchMove = (sourceSquare: string, targetSquare: string, promotion: string = 'q'): boolean => {
     try {
@@ -547,7 +594,7 @@ export default function GamePage() {
         </div>
 
         {/* The Interactive Chessboard */}
-        <div className="w-full aspect-square bg-white p-2.5 sm:p-3 rounded-2xl shadow-card border border-slate-200/90">
+        <div className="w-full aspect-square bg-white p-2.5 sm:p-3 rounded-2xl shadow-card border border-slate-200/90 touch-none select-none">
           <Chessboard
             position={boardFen}
             onPieceDrop={onPieceDrop}
@@ -675,7 +722,7 @@ export default function GamePage() {
               {gameState?.moves?.length || 0}
             </span>
           </div>
-          <div className="flex-1 overflow-y-auto mt-2 space-y-1 text-sm font-mono tabular-nums pr-2">
+          <div ref={moveHistoryContainerRef} className="flex-1 overflow-y-auto mt-2 space-y-1 text-sm font-mono tabular-nums pr-2">
             {gameState?.moves && gameState.moves.length > 0 ? (
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                 {gameState.moves.map((m, idx) => (
@@ -707,7 +754,10 @@ export default function GamePage() {
             <span>Trò Chuyện Trong Trận</span>
           </div>
 
-          <div className="flex-1 overflow-y-auto my-3 space-y-2.5 text-xs pr-1">
+          <div
+            ref={chatContainerRef}
+            className="flex-1 overflow-y-auto my-3 space-y-2.5 text-xs pr-1"
+          >
             {chatMessages.length === 0 ? (
               <p className="text-center text-slate-400 py-8">Gửi lời chào tới đối thủ...</p>
             ) : (
@@ -731,7 +781,6 @@ export default function GamePage() {
                 </div>
               ))
             )}
-            <div ref={chatBottomRef} />
           </div>
 
           <form onSubmit={handleSendMessage} className="flex gap-2 pt-2 border-t border-slate-100">

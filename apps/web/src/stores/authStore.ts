@@ -33,8 +33,10 @@ export const useAuthStore = create<AuthState>((set) => {
     isAuthenticated: !!savedToken && !!savedUser,
 
     setAuth: (user, token) => {
-      localStorage.setItem(STORAGE_KEY_TOKEN, token);
-      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_TOKEN, token);
+        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+      }
       set({ user, token, isAuthenticated: true });
     },
 
@@ -42,14 +44,18 @@ export const useAuthStore = create<AuthState>((set) => {
       set((state) => {
         if (!state.user) return state;
         const updated = { ...state.user, ...userData };
-        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
+        }
         return { user: updated };
       });
     },
 
     logout: () => {
-      localStorage.removeItem(STORAGE_KEY_TOKEN);
-      localStorage.removeItem(STORAGE_KEY_USER);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEY_TOKEN);
+        localStorage.removeItem(STORAGE_KEY_USER);
+      }
       disconnectSocket();
       set({ user: null, token: null, isAuthenticated: false });
     },

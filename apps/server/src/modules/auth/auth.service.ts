@@ -19,7 +19,9 @@ import { logger } from '../../config/logger';
 import { generateVerificationCode, sendVerificationEmail } from '../../utils/mailer';
 
 export class AuthService {
-  private userRepo = getUserRepository();
+  private get userRepo() {
+    return getUserRepository();
+  }
 
   async register(input: RegisterInput): Promise<AuthTokens> {
     const existingUsername = await this.userRepo.findByUsername(input.username);
@@ -53,12 +55,9 @@ export class AuthService {
       logger.error(err, `Failed to send email to ${user.email}`);
     });
 
-    const token = this.generateToken(user);
     return {
-      accessToken: token,
       user: toUserProfile(user),
       verificationRequired: true,
-      verificationCode, // Included for development convenience
     };
   }
 
@@ -157,7 +156,7 @@ export class AuthService {
     };
   }
 
-  async resendVerification(input: ResendVerificationInput): Promise<{ message: string; code?: string }> {
+  async resendVerification(input: ResendVerificationInput): Promise<{ message: string }> {
     const user = await this.userRepo.findByEmail(input.email);
     if (!user) {
       throw new AppError(404, 'Không tìm thấy tài khoản với email này');
@@ -179,7 +178,6 @@ export class AuthService {
 
     return {
       message: 'Mã xác minh mới đã được gửi tới email của bạn',
-      code, // returned for dev convenience
     };
   }
 
@@ -247,17 +245,29 @@ export class AuthService {
     name: string;
     picture?: string;
   }> {
-    // 1. Direct profile provided (already verified on client via Google GIS)
-    if (input.profile?.email) {
-      return {
-        googleId: input.profile.sub || `google-${Buffer.from(input.profile.email).toString('hex').slice(0, 16)}`,
-        email: input.profile.email,
-        name: input.profile.name || input.profile.email.split('@')[0],
-        picture: input.profile.picture,
-      };
+    // 1. Validate ID Token using Google official OAuth2Client
+    if (input.credential) {
+      try {
+        const client = new OAuth2Client(env.GOOGLE_CLIENT_ID || undefined);
+        const ticket = await client.verifyIdToken({
+          idToken: input.credential,
+          audience: env.GOOGLE_CLIENT_ID || undefined,
+        });
+        const payload = ticket.getPayload();
+        if (payload?.email && payload.sub) {
+          return {
+            googleId: payload.sub,
+            email: payload.email,
+            name: payload.name || payload.email.split('@')[0],
+            picture: payload.picture,
+          };
+        }
+      } catch (err: any) {
+        logger.error(err, 'Failed to verify Google ID token');
+      }
     }
 
-    // 2. Case A: Access Token received from Google Popup (OAuth 2.0 initTokenClient)
+    // 2. Validate Access Token server-side via Google Userinfo API
     if (input.accessToken) {
       try {
         const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -267,7 +277,7 @@ export class AuthService {
         });
         if (response.ok) {
           const profile: any = await response.json();
-          if (profile.email) {
+          if (profile?.email && profile.sub) {
             return {
               googleId: profile.sub,
               email: profile.email,
@@ -279,99 +289,9 @@ export class AuthService {
       } catch (err) {
         logger.error(err, 'Failed to fetch userinfo from Google with accessToken');
       }
-
-      // Fallback: tokeninfo endpoint
-      try {
-        const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(input.accessToken)}`);
-        if (res.ok) {
-          const info: any = await res.json();
-          if (info.email) {
-            return {
-              googleId: info.sub || `google-${Buffer.from(info.email).toString('hex').slice(0, 16)}`,
-              email: info.email,
-              name: info.email.split('@')[0],
-            };
-          }
-        }
-      } catch {
-        // ignore
-      }
     }
 
-    // 3. Case B: ID Token (credential)
-    const credential = input.credential || '';
-
-    // Mock / Demo credential support for testing
-    if (credential.startsWith('demo-google-') || credential.startsWith('mock-google-')) {
-      const parts = credential.split(':');
-      const email = parts[1] || 'chess_master@gmail.com';
-      const name = parts[2] || 'Google Chess Player';
-      const picture = parts[3] || 'https://api.dicebear.com/7.x/bottts/svg?seed=chess_master';
-      return {
-        googleId: `mock-google-id-${Buffer.from(email).toString('hex').slice(0, 16)}`,
-        email,
-        name,
-        picture,
-      };
-    }
-
-    if (credential) {
-      try {
-        const client = new OAuth2Client(env.GOOGLE_CLIENT_ID || undefined);
-        const ticket = await client.verifyIdToken({
-          idToken: credential,
-          audience: env.GOOGLE_CLIENT_ID || undefined,
-        });
-        const payload = ticket.getPayload();
-        if (payload && payload.email) {
-          return {
-            googleId: payload.sub,
-            email: payload.email,
-            name: payload.name || payload.email.split('@')[0],
-            picture: payload.picture,
-          };
-        }
-      } catch (err: any) {
-        // Fallback 1: query Google tokeninfo
-        try {
-          const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
-          if (res.ok) {
-            const payload: any = await res.json();
-            if (payload.email) {
-              return {
-                googleId: payload.sub,
-                email: payload.email,
-                name: payload.name || payload.email.split('@')[0],
-                picture: payload.picture,
-              };
-            }
-          }
-        } catch {
-          // ignore
-        }
-
-        // Fallback 2: Decode JWT payload safely
-        try {
-          const parts = credential.split('.');
-          if (parts.length === 3) {
-            const json = Buffer.from(parts[1], 'base64').toString('utf-8');
-            const payload = JSON.parse(json);
-            if (payload.email) {
-              return {
-                googleId: payload.sub,
-                email: payload.email,
-                name: payload.name || payload.email.split('@')[0],
-                picture: payload.picture,
-              };
-            }
-          }
-        } catch {
-          // ignore
-        }
-      }
-    }
-
-    throw new AppError(401, 'Xác thực tài khoản Google không thành công. Vui lòng thử lại.');
+    throw new AppError(401, 'Mã xác thực Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.');
   }
 
   async getCurrentUser(userId: string): Promise<UserProfile> {

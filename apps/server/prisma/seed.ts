@@ -21,9 +21,42 @@ async function main() {
       role: 'ADMIN',
       eloRating: 2000,
       accountStatus: 'ACTIVE',
+      isEmailVerified: true,
     },
   });
   console.log('✅ Admin user seeded:', admin.username);
+
+  // Seed System Users (AI Engine & Guest)
+  await prisma.user.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000001' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000001',
+      username: 'ai_engine',
+      email: 'ai-engine@system.local',
+      displayName: 'StockAI',
+      role: 'PLAYER',
+      eloRating: 1500,
+      isEmailVerified: true,
+      accountStatus: 'ACTIVE',
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000002' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000002',
+      username: 'guest_user',
+      email: 'guest@system.local',
+      displayName: 'Khách',
+      role: 'GUEST',
+      eloRating: 1200,
+      isEmailVerified: true,
+      accountStatus: 'ACTIVE',
+    },
+  });
+  console.log('✅ System AI & Guest users seeded');
 
   // Seed Test Players
   const playersData = [

@@ -58,7 +58,13 @@ export class ChessRulesService implements IChessRulesService {
     }
   }
 
-  applyMove(fen: string, from: string, to: string, promotion?: string): MoveValidationResult {
+  applyMove(
+    fen: string,
+    from: string,
+    to: string,
+    promotion?: string,
+    positionHistory: string[] = []
+  ): MoveValidationResult {
     const chess = new Chess(fen);
     const move = chess.move({
       from,
@@ -70,13 +76,25 @@ export class ChessRulesService implements IChessRulesService {
       throw new Error(`Nước đi không hợp lệ: từ ${from} đến ${to}`);
     }
 
+    const fenAfter = chess.fen();
     const isCheck = chess.inCheck();
     const isCheckmate = chess.isCheckmate();
     const isStalemate = chess.isStalemate();
-    const isThreefold = chess.isThreefoldRepetition();
+
+    // Authoritative FIDE Threefold Repetition Check
+    // Compare base position: board layout, active turn, castling rights, en-passant square
+    const getPositionKey = (f: string) => f.split(' ').slice(0, 4).join(' ');
+    const currentKey = getPositionKey(fenAfter);
+    let repetitionCount = 1;
+    for (const pastFen of positionHistory) {
+      if (getPositionKey(pastFen) === currentKey) {
+        repetitionCount++;
+      }
+    }
+    const isThreefold = repetitionCount >= 3;
     const isFifty = chess.isDraw() && !isStalemate && !isThreefold && !chess.isInsufficientMaterial();
     const isInsufficient = chess.isInsufficientMaterial();
-    const isDraw = chess.isDraw();
+    const isDraw = isStalemate || isThreefold || isFifty || isInsufficient;
 
     let result: GameResultType | null = null;
     let terminationReason: TerminationReasonType | null = null;

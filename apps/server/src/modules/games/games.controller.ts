@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { gameService } from './games.service';
 import { AppError } from '../../middleware/errorHandler';
+import { getIO } from '../../sockets/gameSocket';
+import { SOCKET_EVENTS, GUEST_SYSTEM_USER_ID } from '@online-chess/shared';
+import { gameClockManager } from './gameClock.manager';
 
 export class GamesController {
   async getGame(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -50,15 +53,48 @@ export class GamesController {
 
   async makeMove(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      const gameId = req.params.id;
+      const playerId = req.user?.userId || GUEST_SYSTEM_USER_ID;
       const { from, to, promotion, expectedVersion } = req.body;
+
       const result = await gameService.makeMove({
-        gameId: req.params.id,
-        playerId: req.user?.userId,
+        gameId,
+        playerId,
         from,
         to,
         promotion,
         expectedVersion,
       });
+
+      // Broadcast move to Socket.IO clients watching this game
+      const io = getIO();
+      if (io) {
+        io.to(`game:${gameId}`).emit(SOCKET_EVENTS.MOVE_RESULT, result.moveResult);
+      }
+
+      if (result.moveResult.isGameOver) {
+        gameClockManager.untrackGame(gameId);
+        if (io && result.moveResult.result) {
+          io.to(`game:${gameId}`).emit(SOCKET_EVENTS.GAME_OVER, {
+            gameId,
+            result: result.moveResult.result,
+            terminationReason: result.moveResult.terminationReason,
+            whiteEloChange: result.ratingChanges?.whiteRatingChange,
+            blackEloChange: result.ratingChanges?.blackRatingChange,
+            newWhiteElo: result.ratingChanges?.whiteRatingAfter,
+            newBlackElo: result.ratingChanges?.blackRatingAfter,
+          });
+        }
+      } else {
+        gameClockManager.syncGameClock(gameId, {
+          whiteRemainingMs: result.moveResult.whiteRemainingMs,
+          blackRemainingMs: result.moveResult.blackRemainingMs,
+          currentTurn: result.moveResult.currentTurn,
+          lastMoveTimestamp: Date.now(),
+          status: 'IN_PROGRESS',
+        });
+      }
+
       res.status(200).json({
         success: true,
         data: result.moveResult,
@@ -71,8 +107,24 @@ export class GamesController {
 
   async resign(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const playerId = req.user?.userId || 'guest-human';
-      const result = await gameService.resign(req.params.id, playerId);
+      const gameId = req.params.id;
+      const playerId = req.user?.userId || GUEST_SYSTEM_USER_ID;
+      const result = await gameService.resign(gameId, playerId);
+
+      const io = getIO();
+      if (io) {
+        io.to(`game:${gameId}`).emit(SOCKET_EVENTS.GAME_OVER, {
+          gameId,
+          result: result.game.result,
+          terminationReason: result.game.terminationReason,
+          whiteEloChange: result.ratingChanges?.whiteRatingChange,
+          blackEloChange: result.ratingChanges?.blackRatingChange,
+          newWhiteElo: result.ratingChanges?.whiteRatingAfter,
+          newBlackElo: result.ratingChanges?.blackRatingAfter,
+        });
+      }
+      gameClockManager.untrackGame(gameId);
+
       res.status(200).json({
         success: true,
         message: 'Đã đầu hàng trận đấu',
@@ -84,10 +136,52 @@ export class GamesController {
     }
   }
 
+  async claimTimeout(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const gameId = req.params.id;
+      const playerId = req.user?.userId;
+      const result = await gameService.claimTimeout(gameId, playerId);
+
+      const io = getIO();
+      if (io) {
+        io.to(`game:${gameId}`).emit(SOCKET_EVENTS.MOVE_RESULT, result.moveResult);
+        io.to(`game:${gameId}`).emit(SOCKET_EVENTS.GAME_OVER, {
+          gameId,
+          result: result.moveResult.result,
+          terminationReason: result.moveResult.terminationReason,
+          whiteEloChange: result.ratingChanges?.whiteRatingChange,
+          blackEloChange: result.ratingChanges?.blackRatingChange,
+          newWhiteElo: result.ratingChanges?.whiteRatingAfter,
+          newBlackElo: result.ratingChanges?.blackRatingAfter,
+        });
+      }
+      gameClockManager.untrackGame(gameId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Xử lý hết thời gian thành công',
+        data: result.moveResult,
+        ratingChanges: result.ratingChanges,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async drawOffer(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) throw new AppError(401, 'Chưa đăng nhập');
-      const result = await gameService.offerDraw(req.params.id, req.user.userId);
+      const gameId = req.params.id;
+      const result = await gameService.offerDraw(gameId, req.user.userId);
+
+      const io = getIO();
+      if (io) {
+        io.to(`game:${gameId}`).emit(SOCKET_EVENTS.DRAW_OFFER, {
+          gameId,
+          offeredBy: req.user.userId,
+        });
+      }
+
       res.status(200).json({
         success: true,
         message: 'Đã gửi lời mời hòa tới đối thủ',
@@ -101,7 +195,24 @@ export class GamesController {
   async drawAccept(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) throw new AppError(401, 'Chưa đăng nhập');
-      const result = await gameService.acceptDraw(req.params.id, req.user.userId);
+      const gameId = req.params.id;
+      const result = await gameService.acceptDraw(gameId, req.user.userId);
+
+      const io = getIO();
+      if (io) {
+        io.to(`game:${gameId}`).emit(SOCKET_EVENTS.DRAW_ACCEPT, { gameId });
+        io.to(`game:${gameId}`).emit(SOCKET_EVENTS.GAME_OVER, {
+          gameId,
+          result: result.game.result,
+          terminationReason: result.game.terminationReason,
+          whiteEloChange: result.ratingChanges?.whiteRatingChange,
+          blackEloChange: result.ratingChanges?.blackRatingChange,
+          newWhiteElo: result.ratingChanges?.whiteRatingAfter,
+          newBlackElo: result.ratingChanges?.blackRatingAfter,
+        });
+      }
+      gameClockManager.untrackGame(gameId);
+
       res.status(200).json({
         success: true,
         message: 'Trận đấu kết thúc với kết quả hòa',

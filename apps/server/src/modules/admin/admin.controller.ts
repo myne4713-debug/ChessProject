@@ -4,8 +4,12 @@ import { getGameRepository } from '../games/games.repository.impl';
 import { AppError } from '../../middleware/errorHandler';
 
 export class AdminController {
-  private userRepo = getUserRepository();
-  private gameRepo = getGameRepository();
+  private get userRepo() {
+    return getUserRepository();
+  }
+  private get gameRepo() {
+    return getGameRepository();
+  }
 
   async getUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

@@ -3,8 +3,32 @@ import { RoomData, RoomPlayer, RoomVisibility, RoomStatusType } from '@online-ch
 import { AppError } from '../../middleware/errorHandler';
 import { gameService } from '../games/games.service';
 
+class KeyedMutex {
+  private queues: Map<string, Promise<any>> = new Map();
+
+  async runExclusive<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.queues.get(key) || Promise.resolve();
+    let resolveCurrent!: () => void;
+    const current = new Promise<void>((res) => {
+      resolveCurrent = res;
+    });
+    this.queues.set(key, current);
+
+    try {
+      await prev;
+      return await fn();
+    } finally {
+      if (this.queues.get(key) === current) {
+        this.queues.delete(key);
+      }
+      resolveCurrent();
+    }
+  }
+}
+
 export class RoomService {
   private rooms: Map<string, RoomData> = new Map();
+  private joinMutex = new KeyedMutex();
 
   generateRoomCode(): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -83,81 +107,84 @@ export class RoomService {
     userRating: number;
     colorPreference?: 'white' | 'black' | 'random';
   }): Promise<{ room: RoomData; gameId?: string }> {
-    const room = await this.getRoom(params.roomIdOrCode);
-    if (!room) {
-      throw new AppError(404, 'Không tìm thấy phòng chơi');
-    }
+    const key = (params.roomIdOrCode || '').toUpperCase();
+    return this.joinMutex.runExclusive(key, async () => {
+      const room = await this.getRoom(params.roomIdOrCode);
+      if (!room) {
+        throw new AppError(404, 'Không tìm thấy phòng chơi');
+      }
 
-    // Check if player is already in room
-    const existingIndex = room.players.findIndex((p) => p.userId === params.userId);
-    if (existingIndex !== -1) {
-      room.players[existingIndex].isConnected = true;
-      return { room, gameId: room.gameId || undefined };
-    }
+      // Check if player is already in room
+      const existingIndex = room.players.findIndex((p) => p.userId === params.userId);
+      if (existingIndex !== -1) {
+        room.players[existingIndex].isConnected = true;
+        return { room, gameId: room.gameId || undefined };
+      }
 
-    if (room.players.length >= 2) {
-      throw new AppError(400, 'Phòng chơi đã đủ 2 người');
-    }
+      if (room.players.length >= 2 || room.status !== 'WAITING') {
+        throw new AppError(400, 'Phòng chơi đã đủ 2 người hoặc đang diễn ra trận đấu');
+      }
 
-    const newPlayer: RoomPlayer = {
-      userId: params.userId,
-      username: params.username,
-      eloRating: params.userRating,
-      colorPreference: params.colorPreference || 'random',
-      isReady: true,
-      isHost: false,
-      isConnected: true,
-    };
+      const newPlayer: RoomPlayer = {
+        userId: params.userId,
+        username: params.username,
+        eloRating: params.userRating,
+        colorPreference: params.colorPreference || 'random',
+        isReady: true,
+        isHost: false,
+        isConnected: true,
+      };
 
-    room.players.push(newPlayer);
-    room.status = 'READY';
+      room.players.push(newPlayer);
+      room.status = 'READY';
 
-    // Start game automatically when 2 players are present
-    const host = room.players[0];
-    const guest = room.players[1];
+      // Start game automatically when 2 players are present
+      const host = room.players[0];
+      const guest = room.players[1];
 
-    let whitePlayer: RoomPlayer;
-    let blackPlayer: RoomPlayer;
+      let whitePlayer: RoomPlayer;
+      let blackPlayer: RoomPlayer;
 
-    if (host.colorPreference === 'white') {
-      whitePlayer = host;
-      blackPlayer = guest;
-    } else if (host.colorPreference === 'black') {
-      whitePlayer = guest;
-      blackPlayer = host;
-    } else if (guest.colorPreference === 'white') {
-      whitePlayer = guest;
-      blackPlayer = host;
-    } else if (guest.colorPreference === 'black') {
-      whitePlayer = host;
-      blackPlayer = guest;
-    } else {
-      // Random assignment
-      if (Math.random() < 0.5) {
+      if (host.colorPreference === 'white') {
+        whitePlayer = host;
+        blackPlayer = guest;
+      } else if (host.colorPreference === 'black') {
+        whitePlayer = guest;
+        blackPlayer = host;
+      } else if (guest.colorPreference === 'white') {
+        whitePlayer = guest;
+        blackPlayer = host;
+      } else if (guest.colorPreference === 'black') {
         whitePlayer = host;
         blackPlayer = guest;
       } else {
-        whitePlayer = guest;
-        blackPlayer = host;
+        // Random assignment
+        if (Math.random() < 0.5) {
+          whitePlayer = host;
+          blackPlayer = guest;
+        } else {
+          whitePlayer = guest;
+          blackPlayer = host;
+        }
       }
-    }
 
-    const game = await gameService.createGame({
-      whitePlayerId: whitePlayer.userId,
-      whitePlayerName: whitePlayer.username,
-      whitePlayerRating: whitePlayer.eloRating,
-      blackPlayerId: blackPlayer.userId,
-      blackPlayerName: blackPlayer.username,
-      blackPlayerRating: blackPlayer.eloRating,
-      gameMode: 'PVP',
-      initialTimeMs: room.initialTimeMs,
-      incrementMs: room.incrementMs,
+      const game = await gameService.createGame({
+        whitePlayerId: whitePlayer.userId,
+        whitePlayerName: whitePlayer.username,
+        whitePlayerRating: whitePlayer.eloRating,
+        blackPlayerId: blackPlayer.userId,
+        blackPlayerName: blackPlayer.username,
+        blackPlayerRating: blackPlayer.eloRating,
+        gameMode: 'PVP',
+        initialTimeMs: room.initialTimeMs,
+        incrementMs: room.incrementMs,
+      });
+
+      room.gameId = game.id;
+      room.status = 'IN_PROGRESS';
+
+      return { room, gameId: game.id };
     });
-
-    room.gameId = game.id;
-    room.status = 'IN_PROGRESS';
-
-    return { room, gameId: game.id };
   }
 
   async leaveRoom(roomId: string, userId: string): Promise<RoomData | null> {

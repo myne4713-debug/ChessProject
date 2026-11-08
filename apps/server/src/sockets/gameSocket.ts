@@ -3,6 +3,7 @@ import { AuthenticatedSocket } from './socketAuth';
 import { SOCKET_EVENTS } from '@online-chess/shared';
 import { roomService } from '../modules/rooms/rooms.service';
 import { gameService } from '../modules/games/games.service';
+import { gameClockManager } from '../modules/games/gameClock.manager';
 import { chatService } from '../modules/chat/chat.service';
 import { matchmakingService } from '../modules/matchmaking/matchmaking.service';
 import { getUserRepository } from '../modules/users/users.repository.impl';
@@ -20,7 +21,6 @@ export function getIO(): SocketIOServer | null {
 
 export function registerSocketHandlers(io: SocketIOServer) {
   setIO(io);
-  const userRepo = getUserRepository();
 
   io.on('connection', (socket: Socket) => {
     const authSocket = socket as AuthenticatedSocket;
@@ -34,7 +34,7 @@ export function registerSocketHandlers(io: SocketIOServer) {
           throw new Error('Bạn cần đăng nhập để tham gia phòng');
         }
 
-        const userProfile = await userRepo.findById(user.userId);
+        const userProfile = await getUserRepository().findById(user.userId);
         const rating = userProfile?.eloRating || 1200;
 
         const result = await roomService.joinRoom({
@@ -84,6 +84,9 @@ export function registerSocketHandlers(io: SocketIOServer) {
         socket.join(`game:${payload.gameId}`);
         const state = await gameService.getGameState(payload.gameId);
         const messages = await chatService.getMessages(payload.gameId);
+        if (state.status === 'IN_PROGRESS') {
+          gameClockManager.trackGame(payload.gameId);
+        }
         socket.emit(SOCKET_EVENTS.GAME_STATE, state);
         if (callback) callback({ success: true, data: { state, messages } });
       } catch (err: any) {
@@ -94,10 +97,17 @@ export function registerSocketHandlers(io: SocketIOServer) {
     // MOVE
     socket.on(SOCKET_EVENTS.MOVE, async (payload, callback) => {
       try {
+        if (!user?.userId) {
+          const errMsg = 'Yêu cầu đăng nhập để thực hiện nước đi';
+          socket.emit(SOCKET_EVENTS.ERROR, { code: 'UNAUTHORIZED', message: errMsg });
+          if (callback) callback({ success: false, message: errMsg });
+          return;
+        }
+
         const { gameId, from, to, promotion, expectedVersion } = payload;
         const result = await gameService.makeMove({
           gameId,
-          playerId: user?.userId,
+          playerId: user.userId,
           from,
           to,
           promotion,
@@ -106,6 +116,19 @@ export function registerSocketHandlers(io: SocketIOServer) {
 
         // Broadcast authoritative move result to both players
         io.to(`game:${gameId}`).emit(SOCKET_EVENTS.MOVE_RESULT, result.moveResult);
+
+        // Track or untrack game in active clock manager
+        if (result.moveResult.isGameOver) {
+          gameClockManager.untrackGame(gameId);
+        } else {
+          gameClockManager.syncGameClock(gameId, {
+            whiteRemainingMs: result.moveResult.whiteRemainingMs,
+            blackRemainingMs: result.moveResult.blackRemainingMs,
+            currentTurn: result.moveResult.currentTurn,
+            lastMoveTimestamp: Date.now(),
+            status: 'IN_PROGRESS',
+          });
+        }
 
         // If game is over, broadcast GAME_OVER
         if (result.moveResult.isGameOver && result.moveResult.result) {
@@ -124,6 +147,31 @@ export function registerSocketHandlers(io: SocketIOServer) {
       } catch (err: any) {
         if (callback) callback({ success: false, message: err.message });
         socket.emit(SOCKET_EVENTS.ERROR, { code: 'MOVE_ERROR', message: err.message });
+      }
+    });
+
+    // CLAIM_TIMEOUT
+    socket.on(SOCKET_EVENTS.CLAIM_TIMEOUT, async (payload, callback) => {
+      try {
+        const { gameId } = payload;
+        const result = await gameService.claimTimeout(gameId, user?.userId);
+        gameClockManager.untrackGame(gameId);
+
+        io.to(`game:${gameId}`).emit(SOCKET_EVENTS.MOVE_RESULT, result.moveResult);
+        io.to(`game:${gameId}`).emit(SOCKET_EVENTS.GAME_OVER, {
+          gameId,
+          result: result.moveResult.result,
+          terminationReason: result.moveResult.terminationReason,
+          whiteEloChange: result.ratingChanges?.whiteRatingChange,
+          blackEloChange: result.ratingChanges?.blackRatingChange,
+          newWhiteElo: result.ratingChanges?.whiteRatingAfter,
+          newBlackElo: result.ratingChanges?.blackRatingAfter,
+        });
+
+        if (callback) callback({ success: true, data: result.moveResult });
+      } catch (err: any) {
+        socket.emit(SOCKET_EVENTS.ERROR, { code: 'CLAIM_TIMEOUT_ERROR', message: err.message });
+        if (callback) callback({ success: false, message: err.message });
       }
     });
 
@@ -148,6 +196,7 @@ export function registerSocketHandlers(io: SocketIOServer) {
       try {
         if (!user) throw new Error('Chưa đăng nhập');
         const res = await gameService.resign(payload.gameId, user.userId);
+        gameClockManager.untrackGame(payload.gameId);
 
         io.to(`game:${payload.gameId}`).emit(SOCKET_EVENTS.GAME_OVER, {
           gameId: payload.gameId,
@@ -184,6 +233,7 @@ export function registerSocketHandlers(io: SocketIOServer) {
       try {
         if (!user) return;
         const res = await gameService.acceptDraw(payload.gameId, user.userId);
+        gameClockManager.untrackGame(payload.gameId);
         io.to(`game:${payload.gameId}`).emit(SOCKET_EVENTS.GAME_OVER, {
           gameId: payload.gameId,
           result: 'DRAW',
@@ -228,7 +278,7 @@ export function registerSocketHandlers(io: SocketIOServer) {
     socket.on(SOCKET_EVENTS.MATCHMAKING_JOIN, async (payload, callback) => {
       try {
         if (!user) throw new Error('Vui lòng đăng nhập để ghép trận');
-        const userProfile = await userRepo.findById(user.userId);
+        const userProfile = await getUserRepository().findById(user.userId);
         const rating = userProfile?.eloRating || 1200;
 
         const matchResult = matchmakingService.addToQueue({
@@ -285,6 +335,20 @@ export function registerSocketHandlers(io: SocketIOServer) {
     socket.on(SOCKET_EVENTS.MATCHMAKING_CANCEL, () => {
       if (user) {
         matchmakingService.removeFromQueue(user.userId);
+      }
+    });
+
+    socket.on('disconnecting', () => {
+      if (user) {
+        matchmakingService.removeFromQueue(user.userId);
+        for (const room of socket.rooms) {
+          if (room.startsWith('game:')) {
+            socket.to(room).emit(SOCKET_EVENTS.PLAYER_DISCONNECTED, {
+              userId: user.userId,
+              username: user.username,
+            });
+          }
+        }
       }
     });
 

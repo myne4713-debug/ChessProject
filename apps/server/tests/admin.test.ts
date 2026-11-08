@@ -35,12 +35,17 @@ describe('Phase 8 & 9 - Leaderboard & Administration API Tests', () => {
 
   it('should reject non-admin users from accessing /admin endpoints (403 Forbidden)', async () => {
     // Register normal player
-    const playerAuth = await authService.register({
+    await authService.register({
       username: 'ordinary_player',
       email: 'player@chess.local',
       password: 'Password123!',
     });
-    playerToken = playerAuth.accessToken;
+    const playerRecord = await authService['userRepo'].findByEmail('player@chess.local');
+    const verifiedAuth = await authService.verifyEmail({
+      email: 'player@chess.local',
+      code: playerRecord!.emailVerificationCode!,
+    });
+    playerToken = verifiedAuth.accessToken!;
 
     // Normal player tries to access admin stats
     const forbiddenRes = await request(app)

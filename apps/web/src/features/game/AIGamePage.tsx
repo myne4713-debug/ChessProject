@@ -10,7 +10,10 @@ import {
   AIDifficulty,
   TIME_CONTROLS,
   AISearchStats,
+  AI_SYSTEM_USER_ID,
 } from '@online-chess/shared';
+
+const isAiPlayer = (id?: string | null) => id === 'ai-engine' || id === AI_SYSTEM_USER_ID;
 import {
   RotateCcw,
   RotateCw,
@@ -30,6 +33,7 @@ import {
   User,
   SlidersHorizontal,
 } from 'lucide-react';
+import { PromotionModal } from './components/PromotionModal';
 
 // Chess.com style piece vector icons for captured pieces & status badges
 export function PieceSvg({
@@ -150,6 +154,11 @@ export default function AIGamePage() {
   const [captureMoves, setCaptureMoves] = useState<Set<string>>(new Set());
   const [lastMoveSquares, setLastMoveSquares] = useState<{ from?: string; to?: string }>({});
   const [isCheck, setIsCheck] = useState(false);
+  const [pendingPromotion, setPendingPromotion] = useState<{
+    from: string;
+    to: string;
+    color: 'w' | 'b';
+  } | null>(null);
 
   // User Settings
   const [showHints, setShowHints] = useState(true);
@@ -177,7 +186,7 @@ export default function AIGamePage() {
     if (!gameState || gameState.status !== 'IN_PROGRESS' || gameOverResult) return;
 
     const interval = setInterval(() => {
-      const isHumanWhite = gameState.whitePlayerId !== 'ai-engine';
+      const isHumanWhite = !isAiPlayer(gameState.whitePlayerId);
       const isHumanTurn =
         (gameState.currentTurn === 'w' && isHumanWhite) ||
         (gameState.currentTurn === 'b' && !isHumanWhite);
@@ -318,7 +327,7 @@ export default function AIGamePage() {
         setBoardFen(game.currentFen);
         localChessRef.current = new Chess(game.currentFen);
 
-        const isHumanWhite = game.whitePlayerId !== 'ai-engine';
+        const isHumanWhite = !isAiPlayer(game.whitePlayerId);
         setOrientation(isHumanWhite ? 'white' : 'black');
         setIsCheck(localChessRef.current.inCheck());
 
@@ -422,7 +431,7 @@ export default function AIGamePage() {
         return false;
       }
 
-      const isHumanWhite = gameState.whitePlayerId !== 'ai-engine';
+      const isHumanWhite = !isAiPlayer(gameState.whitePlayerId);
       const isHumanTurn =
         (gameState.currentTurn === 'w' && isHumanWhite) ||
         (gameState.currentTurn === 'b' && !isHumanWhite);
@@ -525,7 +534,7 @@ export default function AIGamePage() {
       return;
     }
 
-    const isHumanWhite = gameState.whitePlayerId !== 'ai-engine';
+    const isHumanWhite = !isAiPlayer(gameState.whitePlayerId);
     const isHumanTurn =
       (gameState.currentTurn === 'w' && isHumanWhite) ||
       (gameState.currentTurn === 'b' && !isHumanWhite);
@@ -534,6 +543,21 @@ export default function AIGamePage() {
 
     // If a piece is already selected and target square is a legal destination -> Move!
     if (selectedSquare && possibleMoves.includes(square)) {
+      const piece = localChessRef.current.get(selectedSquare as Square);
+      const isPawnPromotion =
+        piece &&
+        piece.type === 'p' &&
+        ((piece.color === 'w' && square.endsWith('8')) ||
+          (piece.color === 'b' && square.endsWith('1')));
+
+      if (isPawnPromotion) {
+        setPendingPromotion({ from: selectedSquare, to: square, color: piece.color });
+        setSelectedSquare(null);
+        setPossibleMoves([]);
+        setCaptureMoves(new Set());
+        return;
+      }
+
       executeMove(selectedSquare, square, 'q');
       return;
     }
@@ -563,7 +587,7 @@ export default function AIGamePage() {
       return;
     }
 
-    const isHumanWhite = gameState.whitePlayerId !== 'ai-engine';
+    const isHumanWhite = !isAiPlayer(gameState.whitePlayerId);
     const humanColor = isHumanWhite ? 'w' : 'b';
     const pieceObj = localChessRef.current.get(sourceSquare);
 
@@ -580,14 +604,34 @@ export default function AIGamePage() {
     setSelectedSquare(null);
     setPossibleMoves([]);
     setCaptureMoves(new Set());
+
+    const piece = localChessRef.current.get(sourceSquare);
+    const isPawnPromotion =
+      piece &&
+      piece.type === 'p' &&
+      ((piece.color === 'w' && targetSquare.endsWith('8')) ||
+        (piece.color === 'b' && targetSquare.endsWith('1')));
+
+    if (isPawnPromotion) {
+      setPendingPromotion({ from: sourceSquare, to: targetSquare, color: piece.color });
+      return false;
+    }
+
     return executeMove(sourceSquare, targetSquare, 'q');
+  };
+
+  const handlePromotionSelect = (promPiece: 'q' | 'r' | 'b' | 'n') => {
+    if (!pendingPromotion) return;
+    const { from, to } = pendingPromotion;
+    setPendingPromotion(null);
+    executeMove(from, to, promPiece);
   };
 
   // Resign match
   const handleResign = async () => {
     if (!gameState || gameState.status !== 'IN_PROGRESS') return;
     if (confirm('Bạn có chắc chắn muốn xin thua ván này không?')) {
-      const isHumanWhite = gameState.whitePlayerId !== 'ai-engine';
+      const isHumanWhite = !isAiPlayer(gameState.whitePlayerId);
       const winner = isHumanWhite ? 'Máy (Quân Đen)' : 'Máy (Quân Trắng)';
       setGameOverResult(`${winner} thắng (Bạn xin thua)`);
       playSound('gameover');
@@ -663,8 +707,8 @@ export default function AIGamePage() {
   const isHumanTurn =
     gameState &&
     gameState.status === 'IN_PROGRESS' &&
-    ((gameState.currentTurn === 'w' && gameState.whitePlayerId !== 'ai-engine') ||
-      (gameState.currentTurn === 'b' && gameState.blackPlayerId !== 'ai-engine'));
+    ((gameState.currentTurn === 'w' && !isAiPlayer(gameState.whitePlayerId)) ||
+      (gameState.currentTurn === 'b' && !isAiPlayer(gameState.blackPlayerId)));
 
   // Evaluation centipawns conversion
   const evalPawns = aiStats ? (aiStats.score / 100).toFixed(1) : '0.0';
@@ -673,7 +717,7 @@ export default function AIGamePage() {
   const getGameAssessment = () => {
     if (!aiStats) return 'Ván cờ vừa bắt đầu, chưa có đánh giá thế trận.';
     const score = aiStats.score;
-    const isHumanWhite = gameState?.whitePlayerId !== 'ai-engine';
+    const isHumanWhite = !isAiPlayer(gameState?.whitePlayerId);
     const humanScore = isHumanWhite ? score : -score;
 
     if (Math.abs(score) < 50) return '⚖️ Thế trận đang giằng co rất cân bằng!';
@@ -1250,6 +1294,13 @@ export default function AIGamePage() {
           </div>
         </div>
       )}
+      {/* Pawn Promotion Modal */}
+      <PromotionModal
+        isOpen={!!pendingPromotion}
+        color={pendingPromotion?.color || 'w'}
+        onSelect={handlePromotionSelect}
+        onCancel={() => setPendingPromotion(null)}
+      />
     </div>
   );
 }

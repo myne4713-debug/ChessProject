@@ -1,12 +1,19 @@
 import bcrypt from 'bcryptjs';
 import { getUserRepository } from './users.repository.impl';
+import { getGameRepository } from '../games/games.repository.impl';
 import { toUserProfile, UserRecord } from './users.repository';
 import { AppError } from '../../middleware/errorHandler';
 import { UserProfile, UserStats, UpdateProfileInput } from '@online-chess/shared';
 import { generateVerificationCode, sendVerificationEmail } from '../../utils/mailer';
 
 export class UsersService {
-  private userRepo = getUserRepository();
+  private get userRepo() {
+    return getUserRepository();
+  }
+
+  private get gameRepo() {
+    return getGameRepository();
+  }
 
   async getProfile(userId: string): Promise<UserProfile> {
     const user = await this.userRepo.findById(userId);
@@ -73,15 +80,17 @@ export class UsersService {
       throw new AppError(404, 'Không tìm thấy người dùng');
     }
 
+    const stats = await this.gameRepo.getUserStats(userId);
+
     return {
       userId: user.id,
       username: user.username,
       eloRating: user.eloRating,
-      gamesPlayed: 0,
-      wins: 0,
-      draws: 0,
-      losses: 0,
-      winRate: 0,
+      gamesPlayed: stats.gamesPlayed,
+      wins: stats.wins,
+      draws: stats.draws,
+      losses: stats.losses,
+      winRate: stats.winRate,
     };
   }
 }

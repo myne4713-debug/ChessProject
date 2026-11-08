@@ -18,16 +18,34 @@ export class MatchmakingService {
     // Check if player is already in queue
     this.removeFromQueue(entry.userId);
 
-    // Look for matching opponent
-    const matchIndex = this.queue.findIndex(
-      (q) =>
-        q.initialTimeMs === entry.initialTimeMs &&
-        q.incrementMs === entry.incrementMs &&
-        q.userId !== entry.userId
-    );
+    const now = Date.now();
+    const entryWaitSec = (now - entry.joinedAt) / 1000;
+    const entryWindow = 100 + Math.floor(entryWaitSec / 5) * 50;
 
-    if (matchIndex !== -1) {
-      const opponent = this.queue.splice(matchIndex, 1)[0];
+    // Filter compatible opponents with identical time control and different user
+    const compatibleOpponents = this.queue
+      .map((q, index) => {
+        const qWaitSec = (now - q.joinedAt) / 1000;
+        const qWindow = 100 + Math.floor(qWaitSec / 5) * 50;
+        const maxAllowedDiff = Math.max(entryWindow, qWindow);
+        const eloDiff = Math.abs(q.eloRating - entry.eloRating);
+        return {
+          q,
+          index,
+          eloDiff,
+          isMatch:
+            q.initialTimeMs === entry.initialTimeMs &&
+            q.incrementMs === entry.incrementMs &&
+            q.userId !== entry.userId &&
+            eloDiff <= maxAllowedDiff,
+        };
+      })
+      .filter((item) => item.isMatch)
+      .sort((a, b) => a.eloDiff - b.eloDiff);
+
+    if (compatibleOpponents.length > 0) {
+      const bestMatch = compatibleOpponents[0];
+      const opponent = this.queue.splice(bestMatch.index, 1)[0];
       return {
         matched: true,
         opponent,

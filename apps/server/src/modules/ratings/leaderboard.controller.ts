@@ -3,7 +3,9 @@ import { getUserRepository } from '../users/users.repository.impl';
 import { LeaderboardEntry, LeaderboardResponse } from '@online-chess/shared';
 
 export class LeaderboardController {
-  private userRepo = getUserRepository();
+  private get userRepo() {
+    return getUserRepository();
+  }
 
   async getLeaderboard(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

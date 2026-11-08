@@ -34,16 +34,6 @@ export function isOriginAllowed(origin: string | undefined): boolean {
     return true;
   }
 
-  // Allow public test tunnels
-  if (
-    origin.endsWith('.trycloudflare.com') ||
-    origin.endsWith('.ngrok-free.app') ||
-    origin.endsWith('.ngrok.io') ||
-    origin.endsWith('.loca.lt')
-  ) {
-    return true;
-  }
-
   return false;
 }
 

@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { IUserRepository, UserRecord } from './users.repository';
 import { prisma, isDatabaseConnected } from '../../database/prisma';
+import { AI_SYSTEM_USER_ID, GUEST_SYSTEM_USER_ID } from '@online-chess/shared';
 
 export class MemoryUserRepository implements IUserRepository {
   private users: Map<string, UserRecord> = new Map();
@@ -12,6 +13,36 @@ export class MemoryUserRepository implements IUserRepository {
   private seedDefaultUsers() {
     const now = new Date();
     const defaultUsers: UserRecord[] = [
+      {
+        id: AI_SYSTEM_USER_ID,
+        username: 'ai_engine',
+        email: 'ai-engine@system.local',
+        passwordHash: null,
+        displayName: 'StockAI',
+        bio: 'Động cơ cờ vua tự động',
+        avatarUrl: null,
+        isEmailVerified: true,
+        role: 'PLAYER',
+        eloRating: 1500,
+        accountStatus: 'ACTIVE',
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: GUEST_SYSTEM_USER_ID,
+        username: 'guest_user',
+        email: 'guest@system.local',
+        passwordHash: null,
+        displayName: 'Khách',
+        bio: 'Người chơi khách',
+        avatarUrl: null,
+        isEmailVerified: true,
+        role: 'GUEST',
+        eloRating: 1200,
+        accountStatus: 'ACTIVE',
+        createdAt: now,
+        updatedAt: now,
+      },
       {
         id: 'user-admin-001',
         username: 'admin',
@@ -119,6 +150,7 @@ export class MemoryUserRepository implements IUserRepository {
     emailVerificationExpires?: Date | null;
     role?: UserRecord['role'];
     eloRating?: number;
+    accountStatus?: UserRecord['accountStatus'];
   }): Promise<UserRecord> {
     const now = new Date();
     const user: UserRecord = {
@@ -135,7 +167,7 @@ export class MemoryUserRepository implements IUserRepository {
       emailVerificationExpires: data.emailVerificationExpires || null,
       role: data.role || 'PLAYER',
       eloRating: data.eloRating ?? 1200,
-      accountStatus: 'ACTIVE',
+      accountStatus: data.accountStatus || 'ACTIVE',
       createdAt: now,
       updatedAt: now,
     };
@@ -218,6 +250,7 @@ export class PrismaUserRepository implements IUserRepository {
     emailVerificationExpires?: Date | null;
     role?: UserRecord['role'];
     eloRating?: number;
+    accountStatus?: UserRecord['accountStatus'];
   }): Promise<UserRecord> {
     const user = await prisma.user.create({
       data: {
@@ -233,6 +266,7 @@ export class PrismaUserRepository implements IUserRepository {
         emailVerificationExpires: data.emailVerificationExpires || null,
         role: data.role || 'PLAYER',
         eloRating: data.eloRating ?? 1200,
+        accountStatus: data.accountStatus || 'ACTIVE',
       },
     });
     return user as UserRecord;

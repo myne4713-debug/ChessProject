@@ -3,6 +3,17 @@ import { ChatMessage } from '@online-chess/shared';
 import { prisma, isDatabaseConnected } from '../../database/prisma';
 import { logger } from '../../config/logger';
 
+function sanitizeChatMessage(raw: string): string {
+  return raw
+    .trim()
+    .slice(0, 500)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 export class ChatService {
   private memoryMessages: Map<string, ChatMessage[]> = new Map();
 
@@ -15,7 +26,7 @@ export class ChatService {
     const id = randomUUID();
     const createdAt = new Date().toISOString();
 
-    const sanitizedContent = params.content.trim().slice(0, 500);
+    const sanitizedContent = sanitizeChatMessage(params.content);
 
     const message: ChatMessage = {
       id,

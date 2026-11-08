@@ -1,4 +1,6 @@
 export const STARTING_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+export const AI_SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000001';
+export const GUEST_SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000002';
 
 export const TIME_CONTROLS = {
   BULLET_1: { name: '1 min', initialTimeMs: 60 * 1000, incrementMs: 0 },

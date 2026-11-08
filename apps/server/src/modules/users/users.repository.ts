@@ -37,6 +37,7 @@ export interface IUserRepository {
     emailVerificationExpires?: Date | null;
     role?: UserRole;
     eloRating?: number;
+    accountStatus?: AccountStatus;
   }): Promise<UserRecord>;
   update(id: string, data: Partial<Omit<UserRecord, 'id' | 'createdAt'>>): Promise<UserRecord>;
   findMany(options?: {

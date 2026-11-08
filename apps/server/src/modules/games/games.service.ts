@@ -12,11 +12,14 @@ import {
   STARTING_FEN,
   GameResultType,
   TerminationReasonType,
+  AI_SYSTEM_USER_ID,
 } from '@online-chess/shared';
 import { Chess } from 'chess.js';
 
 export class GameService {
-  private gameRepo = getGameRepository();
+  private get gameRepo() {
+    return getGameRepository();
+  }
 
   async createGame(data: {
     whitePlayerId: string;
@@ -42,6 +45,14 @@ export class GameService {
     const moves = await this.gameRepo.getMovesByGameId(gameId);
     const chess = new Chess(game.currentFen);
 
+    const getPositionKey = (f: string) => f.split(' ').slice(0, 4).join(' ');
+    const currentKey = getPositionKey(game.currentFen);
+    let repetitionCount = 0;
+    for (const pastFen of game.positionHistory || []) {
+      if (getPositionKey(pastFen) === currentKey) repetitionCount++;
+    }
+    const isThreefold = repetitionCount >= 3;
+
     return {
       id: game.id,
       whitePlayerId: game.whitePlayerId,
@@ -65,7 +76,7 @@ export class GameService {
       isCheck: chess.inCheck(),
       isCheckmate: chess.isCheckmate(),
       isStalemate: chess.isStalemate(),
-      isDraw: chess.isDraw(),
+      isDraw: chess.isDraw() || isThreefold,
       startedAt: game.startedAt ? game.startedAt.toISOString() : null,
       endedAt: game.endedAt ? game.endedAt.toISOString() : null,
       createdAt: game.createdAt.toISOString(),
@@ -99,14 +110,20 @@ export class GameService {
       );
     }
 
-    // Verify player and turn
+    // Verify player identity and authoritative turn
     const isWhiteTurn = game.currentTurn === 'w';
-    if (playerId) {
-      if (isWhiteTurn && game.whitePlayerId !== playerId) {
-        throw new AppError(403, 'Không phải lượt đi của bạn (Trắng đang đi)');
+    const expectedPlayerId = isWhiteTurn ? game.whitePlayerId : game.blackPlayerId;
+    const isAiPlayer = expectedPlayerId === 'ai-engine' || expectedPlayerId === AI_SYSTEM_USER_ID;
+
+    if (game.gameMode === 'PVP' || (expectedPlayerId && !isAiPlayer)) {
+      if (!playerId) {
+        throw new AppError(401, 'Yêu cầu đăng nhập để thực hiện nước đi');
       }
-      if (!isWhiteTurn && game.blackPlayerId !== playerId) {
-        throw new AppError(403, 'Không phải lượt đi của bạn (Đen đang đi)');
+      if (playerId !== expectedPlayerId) {
+        throw new AppError(
+          403,
+          `Không phải lượt đi của bạn (${isWhiteTurn ? 'Trắng' : 'Đen'} đang đi)`
+        );
       }
     }
 
@@ -132,57 +149,68 @@ export class GameService {
       blackRemaining += game.incrementMs;
     }
 
-    // Validate and apply move through authoritative rules service
-    const moveValidation = chessRulesService.applyMove(game.currentFen, from, to, promotion);
+    // Validate and apply move through authoritative rules service with threefold history check
+    const moveValidation = chessRulesService.applyMove(
+      game.currentFen,
+      from,
+      to,
+      promotion,
+      game.positionHistory || []
+    );
 
     const moves = await this.gameRepo.getMovesByGameId(gameId);
     const ply = moves.length + 1;
     const moveNumber = Math.ceil(ply / 2);
 
-    const savedMove = await this.gameRepo.addMove({
-      gameId,
-      moveNumber,
-      ply,
-      playerId,
-      fromSquare: from,
-      toSquare: to,
-      promotion,
-      san: moveValidation.san,
-      fenAfter: moveValidation.fenAfter,
-      clockRemainingMs: isWhiteTurn ? whiteRemaining : blackRemaining,
-    });
-
     const isGameOver = moveValidation.isCheckmate || moveValidation.isDraw;
     const nextVersion = game.positionVersion + 1;
+    const nextPositionHistory = [...(game.positionHistory || []), moveValidation.fenAfter];
 
-    let ratingChanges: RatingChangeResult | undefined;
-    if (isGameOver && game.gameMode === 'PVP' && game.blackPlayerId && moveValidation.result) {
-      ratingChanges = await ratingsService.applyGameRatingChanges(
-        game.id,
-        game.whitePlayerId,
-        game.blackPlayerId,
-        moveValidation.result
-      );
-    }
+    const ratingCalculation =
+      isGameOver && game.gameMode === 'PVP' && game.whitePlayerId && game.blackPlayerId && moveValidation.result
+        ? {
+            whitePlayerId: game.whitePlayerId,
+            blackPlayerId: game.blackPlayerId,
+            result: moveValidation.result,
+          }
+        : undefined;
 
-    await this.gameRepo.update(gameId, {
-      currentFen: moveValidation.fenAfter,
-      currentTurn: moveValidation.nextTurn,
-      positionVersion: nextVersion,
-      whiteRemainingMs: whiteRemaining,
-      blackRemainingMs: blackRemaining,
-      lastMoveTimestamp: now,
-      drawOfferedBy: null, // clear any pending draw offer upon move
-      status: isGameOver ? 'COMPLETED' : 'IN_PROGRESS',
-      result: moveValidation.result,
-      terminationReason: moveValidation.terminationReason,
-      endedAt: isGameOver ? new Date() : null,
+    // Atomic Move Transaction: execute CAS update, save move, and calculate rating atomically
+    const txResult = await this.gameRepo.executeMoveTransaction({
+      gameId,
+      expectedVersion,
+      moveData: {
+        gameId,
+        moveNumber,
+        ply,
+        playerId,
+        fromSquare: from,
+        toSquare: to,
+        promotion,
+        san: moveValidation.san,
+        fenAfter: moveValidation.fenAfter,
+        clockRemainingMs: isWhiteTurn ? whiteRemaining : blackRemaining,
+      },
+      gameUpdate: {
+        currentFen: moveValidation.fenAfter,
+        currentTurn: moveValidation.nextTurn,
+        whiteRemainingMs: whiteRemaining,
+        blackRemainingMs: blackRemaining,
+        lastMoveTimestamp: now,
+        positionHistory: nextPositionHistory,
+        drawOfferedBy: null, // clear any pending draw offer upon move
+        status: isGameOver ? 'COMPLETED' : 'IN_PROGRESS',
+        result: moveValidation.result,
+        terminationReason: moveValidation.terminationReason,
+        endedAt: isGameOver ? new Date() : null,
+      },
+      ratingCalculation,
     });
 
     return {
       moveResult: {
         gameId,
-        move: savedMove,
+        move: txResult.move,
         fen: moveValidation.fenAfter,
         currentTurn: moveValidation.nextTurn,
         positionVersion: nextVersion,
@@ -193,7 +221,7 @@ export class GameService {
         whiteRemainingMs: whiteRemaining,
         blackRemainingMs: blackRemaining,
       },
-      ratingChanges,
+      ratingChanges: txResult.ratingChanges,
     };
   }
 
@@ -248,6 +276,32 @@ export class GameService {
       },
       ratingChanges,
     };
+  }
+
+  async claimTimeout(
+    gameId: string,
+    claimantId?: string
+  ): Promise<{ moveResult: MoveResultPayload; ratingChanges?: RatingChangeResult }> {
+    const game = await this.gameRepo.findById(gameId);
+    if (!game) {
+      throw new AppError(404, 'Không tìm thấy trận đấu');
+    }
+    if (game.status !== 'IN_PROGRESS') {
+      throw new AppError(400, 'Trận đấu không ở trạng thái đang diễn ra');
+    }
+
+    const elapsed = Date.now() - (game.lastMoveTimestamp || game.updatedAt.getTime());
+    const isWhite = game.currentTurn === 'w';
+    const activeRemaining = (isWhite ? game.whiteRemainingMs : game.blackRemainingMs) - elapsed;
+
+    if (activeRemaining > 0) {
+      throw new AppError(
+        400,
+        `Đối thủ chưa hết thời gian (${Math.ceil(activeRemaining / 1000)} giây còn lại)`
+      );
+    }
+
+    return this.handleTimeoutInternal(game, isWhite ? 'w' : 'b');
   }
 
   async resign(

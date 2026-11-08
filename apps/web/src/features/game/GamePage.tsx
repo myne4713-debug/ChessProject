@@ -33,6 +33,7 @@ import {
   Swords,
 } from 'lucide-react';
 import { PieceSvg } from './AIGamePage';
+import { PromotionModal } from './components/PromotionModal';
 
 export default function GamePage() {
   const { id: gameId } = useParams<{ id: string }>();
@@ -68,6 +69,11 @@ export default function GamePage() {
   const [incomingDrawOffer, setIncomingDrawOffer] = useState<string | null>(null);
   const [showResignModal, setShowResignModal] = useState(false);
   const [lastMoveSquares, setLastMoveSquares] = useState<{ from?: string; to?: string }>({});
+  const [pendingPromotion, setPendingPromotion] = useState<{
+    from: string;
+    to: string;
+    color: 'w' | 'b';
+  } | null>(null);
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const localChessRef = useRef(new Chess());
@@ -234,11 +240,20 @@ export default function GamePage() {
       setIncomingDrawOffer(data.offeredBy);
     };
 
+    const handleError = () => {
+      // Revert optimistic move on socket rejection
+      if (gameState) {
+        setBoardFen(gameState.currentFen);
+        localChessRef.current = new Chess(gameState.currentFen);
+      }
+    };
+
     socket.on(SOCKET_EVENTS.MOVE_RESULT, handleMoveResult);
     socket.on(SOCKET_EVENTS.CLOCK_UPDATE, handleClockSync);
     socket.on(SOCKET_EVENTS.GAME_OVER, handleGameOver);
     socket.on(SOCKET_EVENTS.CHAT_MESSAGE, handleChatMessage);
     socket.on(SOCKET_EVENTS.DRAW_OFFERED, handleDrawOffered);
+    socket.on(SOCKET_EVENTS.ERROR, handleError);
 
     return () => {
       socket.off(SOCKET_EVENTS.MOVE_RESULT, handleMoveResult);
@@ -246,8 +261,9 @@ export default function GamePage() {
       socket.off(SOCKET_EVENTS.GAME_OVER, handleGameOver);
       socket.off(SOCKET_EVENTS.CHAT_MESSAGE, handleChatMessage);
       socket.off(SOCKET_EVENTS.DRAW_OFFERED, handleDrawOffered);
+      socket.off(SOCKET_EVENTS.ERROR, handleError);
     };
-  }, [gameId, isWaitingRoom, socket, user]);
+  }, [gameId, isWaitingRoom, socket, user, gameState]);
 
   // Local clock tick when in progress
   useEffect(() => {
@@ -255,29 +271,38 @@ export default function GamePage() {
 
     const interval = setInterval(() => {
       if (gameState.currentTurn === 'w') {
-        setWhiteClockMs((prev) => Math.max(0, prev - 1000));
+        setWhiteClockMs((prev) => {
+          const next = Math.max(0, prev - 1000);
+          if (next <= 0 && isPlayer) {
+            socket.emit(SOCKET_EVENTS.CLAIM_TIMEOUT, { gameId });
+          }
+          return next;
+        });
       } else {
-        setBlackClockMs((prev) => Math.max(0, prev - 1000));
+        setBlackClockMs((prev) => {
+          const next = Math.max(0, prev - 1000);
+          if (next <= 0 && isPlayer) {
+            socket.emit(SOCKET_EVENTS.CLAIM_TIMEOUT, { gameId });
+          }
+          return next;
+        });
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [gameState?.currentTurn, gameState?.status, gameOverData]);
+  }, [gameState?.currentTurn, gameState?.status, gameOverData, isPlayer, gameId, socket]);
 
   // Scroll chat to bottom
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  const onPieceDrop = (sourceSquare: string, targetSquare: string) => {
-    if (!isPlayer || !gameId || gameOverData) return false;
-
-    // Check client-side valid move
+  const dispatchMove = (sourceSquare: string, targetSquare: string, promotion: string = 'q'): boolean => {
     try {
       const moveAttempt = localChessRef.current.move({
         from: sourceSquare,
         to: targetSquare,
-        promotion: 'q',
+        promotion,
       });
       if (!moveAttempt) return false;
       localChessRef.current.undo();
@@ -290,15 +315,64 @@ export default function GamePage() {
       return false;
     }
 
-    socket.emit(SOCKET_EVENTS.MOVE, {
-      gameId,
-      from: sourceSquare,
-      to: targetSquare,
-      promotion: 'q',
-      expectedVersion: gameState?.positionVersion ?? 0,
-    });
+    socket.emit(
+      SOCKET_EVENTS.MOVE,
+      {
+        gameId,
+        from: sourceSquare,
+        to: targetSquare,
+        promotion,
+        expectedVersion: gameState?.positionVersion ?? 0,
+      },
+      (res: any) => {
+        if (!res?.success) {
+          // Revert optimistic move on server move rejection
+          if (gameState) {
+            setBoardFen(gameState.currentFen);
+            localChessRef.current = new Chess(gameState.currentFen);
+          }
+        }
+      }
+    );
 
     return true;
+  };
+
+  const onPieceDrop = (sourceSquare: string, targetSquare: string) => {
+    if (!isPlayer || !gameId || gameOverData) return false;
+
+    // Detect pawn promotion to last rank
+    const piece = localChessRef.current.get(sourceSquare as any);
+    const isPawnPromotion =
+      piece &&
+      piece.type === 'p' &&
+      ((piece.color === 'w' && targetSquare.endsWith('8')) ||
+        (piece.color === 'b' && targetSquare.endsWith('1')));
+
+    if (isPawnPromotion) {
+      try {
+        const testAttempt = localChessRef.current.move({
+          from: sourceSquare,
+          to: targetSquare,
+          promotion: 'q',
+        });
+        if (!testAttempt) return false;
+        localChessRef.current.undo();
+        setPendingPromotion({ from: sourceSquare, to: targetSquare, color: piece.color });
+        return false;
+      } catch {
+        return false;
+      }
+    }
+
+    return dispatchMove(sourceSquare, targetSquare, 'q');
+  };
+
+  const handlePromotionSelect = (promPiece: 'q' | 'r' | 'b' | 'n') => {
+    if (!pendingPromotion) return;
+    const { from, to } = pendingPromotion;
+    setPendingPromotion(null);
+    dispatchMove(from, to, promPiece);
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -823,6 +897,19 @@ export default function GamePage() {
           </div>
         </div>
       )}
+      {/* Pawn Promotion Modal */}
+      <PromotionModal
+        isOpen={!!pendingPromotion}
+        color={pendingPromotion?.color || 'w'}
+        onSelect={handlePromotionSelect}
+        onCancel={() => {
+          setPendingPromotion(null);
+          if (gameState) {
+            setBoardFen(gameState.currentFen);
+            localChessRef.current = new Chess(gameState.currentFen);
+          }
+        }}
+      />
     </div>
   );
 }

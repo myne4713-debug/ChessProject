@@ -13,7 +13,9 @@ export interface RatingChangeResult {
 }
 
 export class RatingsService {
-  private userRepo = getUserRepository();
+  private get userRepo() {
+    return getUserRepository();
+  }
 
   calculateExpectedScore(ratingA: number, ratingB: number): number {
     return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
@@ -59,6 +61,68 @@ export class RatingsService {
     blackPlayerId: string,
     result: GameResultType
   ): Promise<RatingChangeResult> {
+    if (isDatabaseConnected) {
+      return await prisma.$transaction(async (tx) => {
+        const whiteUser = await tx.user.findUniqueOrThrow({ where: { id: whitePlayerId } });
+        const blackUser = await tx.user.findUniqueOrThrow({ where: { id: blackPlayerId } });
+
+        const whiteBefore = whiteUser.eloRating;
+        const blackBefore = blackUser.eloRating;
+
+        const { whiteChange, blackChange } = this.calculateEloChange(
+          whiteBefore,
+          blackBefore,
+          result
+        );
+
+        const whiteAfter = Math.max(100, whiteBefore + whiteChange);
+        const blackAfter = Math.max(100, blackBefore + blackChange);
+
+        await tx.user.update({
+          where: { id: whitePlayerId },
+          data: { eloRating: whiteAfter },
+        });
+
+        await tx.user.update({
+          where: { id: blackPlayerId },
+          data: { eloRating: blackAfter },
+        });
+
+        await tx.ratingHistory.createMany({
+          data: [
+            {
+              userId: whitePlayerId,
+              gameId,
+              ratingBefore: whiteBefore,
+              ratingAfter: whiteAfter,
+              ratingChange: whiteChange,
+            },
+            {
+              userId: blackPlayerId,
+              gameId,
+              ratingBefore: blackBefore,
+              ratingAfter: blackAfter,
+              ratingChange: blackChange,
+            },
+          ],
+        });
+
+        logger.info(
+          `Updated ELO (Atomic TX): White ${whiteBefore} -> ${whiteAfter} (${whiteChange >= 0 ? '+' : ''}${whiteChange}), Black ${blackBefore} -> ${blackAfter} (${blackChange >= 0 ? '+' : ''}${blackChange})`
+        );
+
+        return {
+          whiteRatingBefore: whiteBefore,
+          whiteRatingAfter: whiteAfter,
+          whiteRatingChange: whiteChange,
+          blackRatingBefore: blackBefore,
+          blackRatingAfter: blackAfter,
+          blackRatingChange: blackChange,
+        };
+      });
+    }
+
+    // In-memory fallback (for unit tests / mock mode)
     const whiteUser = await this.userRepo.findById(whitePlayerId);
     const blackUser = await this.userRepo.findById(blackPlayerId);
 
@@ -78,35 +142,8 @@ export class RatingsService {
     const whiteAfter = Math.max(100, whiteBefore + whiteChange);
     const blackAfter = Math.max(100, blackBefore + blackChange);
 
-    // Update ratings
     await this.userRepo.update(whitePlayerId, { eloRating: whiteAfter });
     await this.userRepo.update(blackPlayerId, { eloRating: blackAfter });
-
-    // If database connected, persist rating history in PostgreSQL
-    if (isDatabaseConnected) {
-      try {
-        await prisma.ratingHistory.createMany({
-          data: [
-            {
-              userId: whitePlayerId,
-              gameId,
-              ratingBefore: whiteBefore,
-              ratingAfter: whiteAfter,
-              ratingChange: whiteChange,
-            },
-            {
-              userId: blackPlayerId,
-              gameId,
-              ratingBefore: blackBefore,
-              ratingAfter: blackAfter,
-              ratingChange: blackChange,
-            },
-          ],
-        });
-      } catch (err) {
-        logger.error(err, 'Failed to save rating histories to database');
-      }
-    }
 
     logger.info(
       `Updated ELO: White ${whiteBefore} -> ${whiteAfter} (${whiteChange >= 0 ? '+' : ''}${whiteChange}), Black ${blackBefore} -> ${blackAfter} (${blackChange >= 0 ? '+' : ''}${blackChange})`

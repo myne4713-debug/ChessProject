@@ -95,7 +95,7 @@ model User {
 
 model Game {
   id                String             @id @default(uuid())
-  whitePlayerId     String
+  whitePlayerId     String?
   blackPlayerId     String?
   gameMode          GameMode           @default(PVP)
   aiDifficulty      String?
@@ -109,12 +109,14 @@ model Game {
   currentTurn       String             @default("w")
   currentFen        String             @default("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
   positionVersion   Int                @default(0)
+  lastMoveTimestamp BigInt?
+  positionHistory   String[]           @default([])
   startedAt         DateTime?
   endedAt           DateTime?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
-  whitePlayer     User            @relation("WhitePlayer", fields: [whitePlayerId], references: [id], onDelete: Cascade)
+  whitePlayer     User?           @relation("WhitePlayer", fields: [whitePlayerId], references: [id], onDelete: SetNull)
   blackPlayer     User?           @relation("BlackPlayer", fields: [blackPlayerId], references: [id], onDelete: SetNull)
   moves           Move[]
   messages        Message[]

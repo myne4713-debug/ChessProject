@@ -30,10 +30,9 @@ export interface UserStats {
 }
 
 export interface AuthTokens {
-  accessToken: string;
+  accessToken?: string;
   user: UserProfile;
   verificationRequired?: boolean;
-  verificationCode?: string; // Trả về trong môi trường dev nếu cần test
 }
 
 export interface AuthResponse {

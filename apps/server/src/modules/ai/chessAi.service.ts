@@ -96,6 +96,9 @@ export interface IChessAI {
 }
 
 export class CustomChessAI implements IChessAI {
+  private static whitePawnFiles = new Int8Array(8);
+  private static blackPawnFiles = new Int8Array(8);
+
   private stats: AISearchStats = {
     depth: 0,
     nodesVisited: 0,
@@ -115,22 +118,18 @@ export class CustomChessAI implements IChessAI {
   }
 
   evaluatePosition(chess: Chess): number {
-    if (chess.isCheckmate()) {
-      // Current side is checkmated, disadvantage to current turn
-      return chess.turn() === 'w' ? -100000 : 100000;
-    }
-    if (chess.isDraw()) {
-      return 0;
-    }
-
     let whiteScore = 0;
     let blackScore = 0;
 
-    const board = chess.board();
+    // Fast direct board access without allocating 8x8 arrays (0x88 board representation)
+    const internalBoard: any[] = (chess as any)._board;
+    CustomChessAI.whitePawnFiles.fill(0);
+    CustomChessAI.blackPawnFiles.fill(0);
 
     for (let r = 0; r < 8; r++) {
+      const rowOffset = r << 4;
       for (let c = 0; c < 8; c++) {
-        const piece = board[r][c];
+        const piece = internalBoard ? internalBoard[rowOffset | c] : null;
         if (!piece) continue;
 
         const squareIndex = r * 8 + c;
@@ -141,6 +140,8 @@ export class CustomChessAI implements IChessAI {
         switch (piece.type) {
           case 'p':
             pstVal = piece.color === 'w' ? PAWN_PST[squareIndex] : PAWN_PST[mirroredIndex];
+            if (piece.color === 'w') CustomChessAI.whitePawnFiles[c]++;
+            else CustomChessAI.blackPawnFiles[c]++;
             break;
           case 'n':
             pstVal = piece.color === 'w' ? KNIGHT_PST[squareIndex] : KNIGHT_PST[mirroredIndex];
@@ -167,10 +168,13 @@ export class CustomChessAI implements IChessAI {
       }
     }
 
-    // Pawn structure evaluation: penalize doubled pawns
-    const doubledPawnsPenalty = this.evaluateDoubledPawns(board);
-    whiteScore -= doubledPawnsPenalty.white;
-    blackScore -= doubledPawnsPenalty.black;
+    // Pawn structure: penalize doubled pawns using preallocated static typed array
+    for (let c = 0; c < 8; c++) {
+      const wCount = CustomChessAI.whitePawnFiles[c];
+      const bCount = CustomChessAI.blackPawnFiles[c];
+      if (wCount > 1) whiteScore -= (wCount - 1) * 20;
+      if (bCount > 1) blackScore -= (bCount - 1) * 20;
+    }
 
     // Check bonus
     if (chess.inCheck()) {
@@ -182,31 +186,6 @@ export class CustomChessAI implements IChessAI {
     }
 
     return whiteScore - blackScore;
-  }
-
-  private evaluateDoubledPawns(board: (any | null)[][]): { white: number; black: number } {
-    const whitePawnFiles = new Array(8).fill(0);
-    const blackPawnFiles = new Array(8).fill(0);
-
-    for (let r = 0; r < 8; r++) {
-      for (let c = 0; c < 8; c++) {
-        const p = board[r][c];
-        if (p && p.type === 'p') {
-          if (p.color === 'w') whitePawnFiles[c]++;
-          else blackPawnFiles[c]++;
-        }
-      }
-    }
-
-    let whitePenalty = 0;
-    let blackPenalty = 0;
-
-    for (let c = 0; c < 8; c++) {
-      if (whitePawnFiles[c] > 1) whitePenalty += (whitePawnFiles[c] - 1) * 20;
-      if (blackPawnFiles[c] > 1) blackPenalty += (blackPawnFiles[c] - 1) * 20;
-    }
-
-    return { white: whitePenalty, black: blackPenalty };
   }
 
   orderMoves(chess: Chess, moves: Move[]): Move[] {
@@ -238,6 +217,70 @@ export class CustomChessAI implements IChessAI {
     });
   }
 
+  private quiescence(
+    chess: Chess,
+    alpha: number,
+    beta: number,
+    isMaximizing: boolean,
+    qply: number
+  ): number {
+    this.stats.nodesVisited++;
+    const standPat = this.evaluatePosition(chess);
+
+    // Limit quiescence depth to 4 plies to avoid horizon explosion
+    if (qply >= 4 || this.isTimeout) {
+      return standPat;
+    }
+
+    if (isMaximizing) {
+      if (standPat >= beta) return beta;
+      if (standPat > alpha) alpha = standPat;
+
+      const legalMoves = chess.moves({ verbose: true });
+      const captureMoves = legalMoves.filter((m) => !!m.captured || !!m.promotion);
+      if (captureMoves.length === 0) return standPat;
+
+      const orderedCaptures = this.orderMoves(chess, captureMoves);
+
+      for (const move of orderedCaptures) {
+        chess.move(move);
+        const score = this.quiescence(chess, alpha, beta, false, qply + 1);
+        chess.undo();
+
+        if (score >= beta) {
+          this.stats.nodesPruned++;
+          return beta;
+        }
+        if (score > alpha) alpha = score;
+        if (this.isTimeout) break;
+      }
+      return alpha;
+    } else {
+      if (standPat <= alpha) return alpha;
+      if (standPat < beta) beta = standPat;
+
+      const legalMoves = chess.moves({ verbose: true });
+      const captureMoves = legalMoves.filter((m) => !!m.captured || !!m.promotion);
+      if (captureMoves.length === 0) return standPat;
+
+      const orderedCaptures = this.orderMoves(chess, captureMoves);
+
+      for (const move of orderedCaptures) {
+        chess.move(move);
+        const score = this.quiescence(chess, alpha, beta, true, qply + 1);
+        chess.undo();
+
+        if (score <= alpha) {
+          this.stats.nodesPruned++;
+          return alpha;
+        }
+        if (score < beta) beta = score;
+        if (this.isTimeout) break;
+      }
+      return beta;
+    }
+  }
+
   search(
     chess: Chess,
     depth: number,
@@ -255,11 +298,26 @@ export class CustomChessAI implements IChessAI {
       }
     }
 
-    if (this.isTimeout || depth === 0 || chess.isGameOver()) {
+    if (this.isTimeout) {
       return this.evaluatePosition(chess);
     }
 
+    if (depth <= 0) {
+      return this.quiescence(chess, alpha, beta, isMaximizing, 0);
+    }
+
     const legalMoves = chess.moves({ verbose: true });
+    if (legalMoves.length === 0) {
+      if (chess.inCheck()) {
+        return isMaximizing ? -100000 + ply : 100000 - ply;
+      }
+      return 0; // Stalemate
+    }
+
+    if (chess.isDraw()) {
+      return 0;
+    }
+
     const orderedMoves = this.orderMoves(chess, legalMoves);
 
     if (isMaximizing) {

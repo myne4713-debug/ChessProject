@@ -6,7 +6,9 @@ import { getIO } from '../../sockets/gameSocket';
 import { SOCKET_EVENTS } from '@online-chess/shared';
 
 export class RoomsController {
-  private userRepo = getUserRepository();
+  private get userRepo() {
+    return getUserRepository();
+  }
 
   async getRooms(_req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

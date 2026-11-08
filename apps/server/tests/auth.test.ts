@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app';
 import { authService } from '../src/modules/auth/auth.service';
+import { OAuth2Client } from 'google-auth-library';
 
 describe('Phase 3 - Authentication & Users API', () => {
   const app = createApp();
@@ -17,7 +18,7 @@ describe('Phase 3 - Authentication & Users API', () => {
     await authService.seedAdminUser();
   });
 
-  it('POST /auth/register should register a new player requiring verification', async () => {
+  it('POST /auth/register should register a new player requiring verification without leaking OTP or token', async () => {
     const res = await request(app)
       .post('/api/v1/auth/register')
       .send(testUser);
@@ -30,8 +31,14 @@ describe('Phase 3 - Authentication & Users API', () => {
     expect(res.body.data.user.role).toBe('PLAYER');
     expect(res.body.data.user.isEmailVerified).toBe(false);
     expect(res.body.data.verificationRequired).toBe(true);
+    // Security checks: verificationCode and accessToken MUST NOT be leaked in register response
+    expect(res.body.data.verificationCode).toBeUndefined();
+    expect(res.body.data.accessToken).toBeUndefined();
 
-    verificationCode = res.body.data.verificationCode;
+    // In unit test, fetch the securely stored verification code from the repository
+    const userRecord = await authService['userRepo'].findByEmail(testUser.email);
+    verificationCode = userRecord!.emailVerificationCode!;
+    expect(verificationCode).toBeDefined();
   });
 
   it('POST /auth/login should block login if email is not verified', async () => {
@@ -176,11 +183,20 @@ describe('Phase 3 - Authentication & Users API', () => {
     expect(res.body.success).toBe(false);
   });
 
-  it('POST /auth/google should authenticate and register/login with Google token', async () => {
+  it('POST /auth/google should authenticate and register/login with verified Google ID token', async () => {
+    vi.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockResolvedValueOnce({
+      getPayload: () => ({
+        sub: 'google-sub-123456789',
+        email: 'master_google@gmail.com',
+        name: 'Google Master',
+        picture: 'https://api.dicebear.com/7.x/bottts/svg?seed=gm',
+      }),
+    } as any);
+
     const res = await request(app)
       .post('/api/v1/auth/google')
       .send({
-        credential: 'mock-google-token:master_google@gmail.com:Google Master:https://api.dicebear.com/7.x/bottts/svg?seed=gm',
+        credential: 'valid-google-id-token-signature',
       });
 
     expect(res.status).toBe(200);
@@ -189,6 +205,17 @@ describe('Phase 3 - Authentication & Users API', () => {
     expect(res.body.data.user.displayName).toBe('Google Master');
     expect(res.body.data.user.isEmailVerified).toBe(true);
     expect(res.body.data.accessToken).toBeDefined();
+  });
+
+  it('POST /auth/google should reject forge attempt with arbitrary profile payload (Finding C-01)', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/google')
+      .send({
+        profile: { email: 'admin@onlinechess.local' },
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
   });
 
   it('GET /auth/me should return current user profile with valid Bearer token', async () => {
@@ -205,6 +232,43 @@ describe('Phase 3 - Authentication & Users API', () => {
   it('GET /auth/me should return 401 without token', async () => {
     const res = await request(app).get('/api/v1/auth/me');
     expect(res.status).toBe(401);
+  });
+
+  it('authenticate middleware should block unverified users from protected endpoints', async () => {
+    const unverifiedUser = await authService['userRepo'].create({
+      username: 'unverified_dummy',
+      email: 'unverified@test.local',
+      role: 'PLAYER',
+      eloRating: 1200,
+      isEmailVerified: false,
+    });
+    const unverifiedToken = authService.generateToken(unverifiedUser);
+
+    const res = await request(app)
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${unverifiedToken}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.message).toContain('chưa được xác minh email');
+  });
+
+  it('authenticate middleware should block suspended users from protected endpoints', async () => {
+    const suspendedUser = await authService['userRepo'].create({
+      username: 'banned_dummy',
+      email: 'banned@test.local',
+      role: 'PLAYER',
+      eloRating: 1200,
+      isEmailVerified: true,
+      accountStatus: 'SUSPENDED',
+    });
+    const suspendedToken = authService.generateToken(suspendedUser);
+
+    const res = await request(app)
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${suspendedToken}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.message).toContain('khóa');
   });
 
   it('PATCH /users/me should update user profile (displayName, bio, avatarUrl)', async () => {

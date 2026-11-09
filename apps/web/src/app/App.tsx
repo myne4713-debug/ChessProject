@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { Chess } from 'chess.js';
 import {
@@ -25,18 +25,18 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
-import { PieceSvg } from '../features/game/AIGamePage';
+import { PieceSvg } from '../components/chess/PieceSvg';
 
-import LoginPage from '../features/auth/LoginPage';
-import RegisterPage from '../features/auth/RegisterPage';
-import VerifyEmailPage from '../features/auth/VerifyEmailPage';
-import LobbyPage from '../features/lobby/LobbyPage';
-import GamePage from '../features/game/GamePage';
-import AIGamePage from '../features/game/AIGamePage';
-import ProfilePage from '../features/profile/ProfilePage';
-import GameReplayPage from '../features/game/GameReplayPage';
-import LeaderboardPage from '../features/leaderboard/LeaderboardPage';
-import AdminPage from '../features/admin/AdminPage';
+const LoginPage = lazy(() => import('../features/auth/LoginPage'));
+const RegisterPage = lazy(() => import('../features/auth/RegisterPage'));
+const VerifyEmailPage = lazy(() => import('../features/auth/VerifyEmailPage'));
+const LobbyPage = lazy(() => import('../features/lobby/LobbyPage'));
+const GamePage = lazy(() => import('../features/game/GamePage'));
+const AIGamePage = lazy(() => import('../features/game/AIGamePage'));
+const ProfilePage = lazy(() => import('../features/profile/ProfilePage'));
+const GameReplayPage = lazy(() => import('../features/game/GameReplayPage'));
+const LeaderboardPage = lazy(() => import('../features/leaderboard/LeaderboardPage'));
+const AdminPage = lazy(() => import('../features/admin/AdminPage'));
 
 export default function App() {
   const { user, isAuthenticated, logout } = useAuthStore();
@@ -172,7 +172,7 @@ export default function App() {
                   onClick={handleLogout}
                   aria-label="Đăng xuất tài khoản"
                   title="Đăng xuất"
-                  className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-rose-500"
+                  className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-rose-500"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -202,7 +202,7 @@ export default function App() {
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? 'Đóng menu' : 'Mở menu điều hướng'}
-              className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors focus-visible:ring-2 focus-visible:ring-sky-500"
+              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors focus-visible:ring-2 focus-visible:ring-sky-500"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -352,20 +352,28 @@ export default function App() {
 
       {/* Main View Router */}
       <main className="flex-1 flex flex-col">
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
-          <Route path="/lobby" element={<LobbyPage />} />
-          <Route path="/game/:id" element={<GamePage />} />
-          <Route path="/ai" element={<AIGamePage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/history" element={<GameReplayPage />} />
-          <Route path="/leaderboard" element={<LeaderboardPage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
+        <Suspense
+          fallback={
+            <div className="flex-1 flex items-center justify-center p-12 text-slate-400">
+              <div className="w-7 h-7 border-2 border-sky-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          }
+        >
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/lobby" element={<LobbyPage />} />
+            <Route path="/game/:id" element={<GamePage />} />
+            <Route path="/ai" element={<AIGamePage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/history" element={<GameReplayPage />} />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </Suspense>
       </main>
 
       {/* Footer */}
@@ -377,7 +385,7 @@ export default function App() {
             </div>
             <div>
               <span className="font-bold text-slate-800 text-sm">Online Chess Platform</span>
-              <p className="text-[11px] text-slate-400">Đấu trường cờ vua trực tuyến thời gian thực & AI Minimax</p>
+              <p className="text-[11px] text-slate-600">Đấu trường cờ vua trực tuyến thời gian thực & AI Minimax</p>
             </div>
           </div>
 
@@ -718,7 +726,7 @@ function LandingPage() {
 
                   return (
                     <div key={pairIdx} className="flex items-center gap-1.5 py-1 px-2 rounded-lg hover:bg-white transition-colors">
-                      <span className="text-slate-400 w-5 tabular-nums">{pairIdx + 1}.</span>
+                      <span className="text-slate-600 w-5 tabular-nums font-semibold">{pairIdx + 1}.</span>
                       {whiteMove && (
                         <button
                           onClick={() => {

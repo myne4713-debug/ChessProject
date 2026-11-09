@@ -197,7 +197,7 @@ export default function ProfilePage() {
                 {user?.role}
               </span>
             </div>
-            <div className="text-xs text-slate-400 mt-0.5 font-mono">@{user?.username}</div>
+            <div className="text-xs text-slate-600 mt-0.5 font-mono font-medium">@{user?.username}</div>
 
             {/* Verification Status Badge */}
             <div className="flex items-center gap-2 mt-2">
@@ -257,8 +257,10 @@ export default function ProfilePage() {
         {/* Left Column: Profile Tabs & Form */}
         <div className="lg:col-span-7 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-card flex flex-col">
           {/* Navigation Tabs */}
-          <div className="flex items-center gap-2 border-b border-slate-200/80 pb-3 mb-6">
+          <div role="tablist" aria-label="Các mục hồ sơ cá nhân" className="flex items-center gap-2 border-b border-slate-200/80 pb-3 mb-6">
             <button
+              role="tab"
+              aria-selected={activeTab === 'info'}
               type="button"
               onClick={() => setActiveTab('info')}
               className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150 flex items-center gap-2 ${
@@ -271,6 +273,8 @@ export default function ProfilePage() {
               <span>Thông Tin Kỳ Thủ</span>
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === 'avatar'}
               type="button"
               onClick={() => setActiveTab('avatar')}
               className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150 flex items-center gap-2 ${
@@ -283,6 +287,8 @@ export default function ProfilePage() {
               <span>Ảnh Đại Diện</span>
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === 'security'}
               type="button"
               onClick={() => setActiveTab('security')}
               className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150 flex items-center gap-2 ${
@@ -330,7 +336,7 @@ export default function ProfilePage() {
                     maxLength={50}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/90 rounded-xl text-slate-900 text-base sm:text-sm focus:outline-none focus:border-sky-500 focus:bg-white transition-colors"
                   />
-                  <p className="text-[11px] text-slate-400 mt-1">
+                  <p className="text-[11px] text-slate-600 mt-1">
                     Tên hiển thị sẽ xuất hiện trong các phòng thi đấu cờ và bảng xếp hạng.
                   </p>
                 </div>
@@ -347,7 +353,7 @@ export default function ProfilePage() {
                     maxLength={300}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200/90 rounded-xl text-slate-900 text-base sm:text-sm focus:outline-none focus:border-sky-500 focus:bg-white transition-colors resize-none"
                   />
-                  <div className="text-[11px] text-slate-400 text-right">{bio.length}/300</div>
+                  <div className="text-[11px] text-slate-600 font-medium text-right">{bio.length}/300</div>
                 </div>
 
                 <div>
@@ -404,7 +410,7 @@ export default function ProfilePage() {
                       </span>{' '}
                       <span className="text-xs text-slate-500">hoặc kéo thả ảnh vào đây</span>
                     </div>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-slate-600">
                       Hỗ trợ PNG, JPG, JPEG, WEBP, GIF (Tự động căn chỉnh & tối ưu hóa ảnh đại diện)
                     </p>
                   </div>
@@ -598,7 +604,7 @@ export default function ProfilePage() {
                         >
                           {won ? 'Thắng' : isDraw ? 'Hòa' : 'Thua'}
                         </span>
-                        <div className="text-[10px] text-slate-400 mt-1 uppercase">
+                        <div className="text-[10px] text-slate-600 mt-1 uppercase font-semibold">
                           {g.terminationReason || 'Hoàn tất'}
                         </div>
                       </div>

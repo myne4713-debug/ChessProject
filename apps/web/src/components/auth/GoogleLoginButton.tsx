@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import { reconnectSocketWithAuth } from '../../services/socket';
+import { useDialogFocusTrap } from '../../hooks/useDialogFocusTrap';
 import { KeyRound, X } from 'lucide-react';
 
 declare global {
@@ -27,6 +28,11 @@ export default function GoogleLoginButton({
   const setAuth = useAuthStore((s) => s.setAuth);
   const [isLoading, setIsLoading] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
+
+  const configModalRef = useDialogFocusTrap<HTMLDivElement>({
+    isOpen: showConfigModal,
+    onClose: () => setShowConfigModal(false),
+  });
 
   // Read client ID with fallback to your configured client ID
   const envClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
@@ -228,21 +234,24 @@ export default function GoogleLoginButton({
       {showConfigModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
           <div
+            ref={configModalRef}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="google-config-title"
             className="w-full max-w-md bg-white rounded-2xl p-6 border border-slate-200/90 shadow-dialog animate-in zoom-in-95 duration-150"
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-5 h-5 text-sky-600" />
-                <h3 className="font-bold text-slate-900 text-sm">
+                <h3 id="google-config-title" className="font-bold text-slate-900 text-sm">
                   Cấu Hình Google OAuth Client ID
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowConfigModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                aria-label="Đóng cấu hình Google Client ID"
+                className="text-slate-400 hover:text-slate-600 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -262,7 +271,7 @@ export default function GoogleLoginButton({
                   value={inputClientId}
                   onChange={(e) => setInputClientId(e.target.value)}
                   placeholder="xxxx-xxxxxxxx.apps.googleusercontent.com"
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-mono focus:outline-none focus:border-sky-500 focus:bg-white"
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-base sm:text-xs font-mono focus:outline-none focus:border-sky-500 focus:bg-white"
                   required
                 />
               </div>

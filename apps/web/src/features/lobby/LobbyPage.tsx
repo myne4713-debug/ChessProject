@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { getSocket } from '../../services/socket';
 import { useAuthStore } from '../../stores/authStore';
+import { useDialogFocusTrap } from '../../hooks/useDialogFocusTrap';
 import { RoomData, TIME_CONTROLS, SOCKET_EVENTS } from '@online-chess/shared';
 import {
   Plus,
@@ -32,6 +33,11 @@ export default function LobbyPage() {
   const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
   const [colorPref, setColorPref] = useState<'white' | 'black' | 'random'>('random');
   const [selectedTimeKey, setSelectedTimeKey] = useState<keyof typeof TIME_CONTROLS>('BLITZ_5');
+
+  const createModalRef = useDialogFocusTrap<HTMLDivElement>({
+    isOpen: showCreateModal,
+    onClose: () => setShowCreateModal(false),
+  });
 
   // Join code state
   const [joinCode, setJoinCode] = useState(urlJoinCode);
@@ -337,7 +343,7 @@ export default function LobbyPage() {
                 value={filterQuery}
                 onChange={(e) => setFilterQuery(e.target.value)}
                 placeholder="Lọc phòng hoặc chủ phòng..."
-                className="w-full pl-9 pr-3 py-1.5 text-xs sm:text-sm bg-slate-50 border border-slate-200/90 rounded-xl focus:outline-none focus:border-sky-500 focus:bg-white transition-colors"
+                className="w-full pl-9 pr-3 py-2 sm:py-1.5 text-base sm:text-sm bg-slate-50 border border-slate-200/90 rounded-xl focus:outline-none focus:border-sky-500 focus:bg-white transition-colors"
               />
             </div>
 
@@ -345,7 +351,7 @@ export default function LobbyPage() {
               onClick={() => refetchRooms()}
               aria-label="Làm mới danh sách phòng"
               title="Làm mới"
-              className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/90 text-slate-600 transition-colors"
+              className="p-2 sm:p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-[0.98] border border-slate-200/90 text-slate-600 transition-colors"
             >
               <RefreshCw className={`w-4 h-4 ${isFetchingRooms ? 'animate-spin text-sky-600' : ''}`} />
             </button>
@@ -355,13 +361,13 @@ export default function LobbyPage() {
         {/* Room Grid */}
         <div className="flex-1 mt-6">
           {isLoadingRooms ? (
-            <div className="py-16 text-center text-slate-400 flex flex-col items-center">
+            <div className="py-16 text-center text-slate-500 flex flex-col items-center">
               <div className="w-6 h-6 border-2 border-sky-600 border-t-transparent rounded-full animate-spin mb-3" />
               <span className="text-sm font-medium">Đang tải danh sách phòng...</span>
             </div>
           ) : filteredRooms.length === 0 ? (
-            <div className="py-16 text-center text-slate-400 flex flex-col items-center">
-              <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-3 text-slate-400">
+            <div className="py-16 text-center text-slate-500 flex flex-col items-center">
+              <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-3 text-slate-500">
                 <Users className="w-8 h-8" />
               </div>
               <p className="text-base font-bold text-slate-700">Chưa có phòng nào đang chờ</p>
@@ -409,7 +415,7 @@ export default function LobbyPage() {
                         <span className="text-xs text-slate-600">
                           Chủ phòng: <strong className="text-slate-900">{host?.username}</strong>
                         </span>
-                        <span className="text-[11px] font-mono tabular-nums text-slate-400">
+                        <span className="text-[11px] font-mono tabular-nums text-slate-600 font-semibold">
                           ({host?.eloRating} ELO)
                         </span>
                       </div>
@@ -417,7 +423,7 @@ export default function LobbyPage() {
 
                     <button
                       onClick={() => handleJoinDirect(r.id)}
-                      className="w-full py-2 bg-sky-600 hover:bg-sky-700 active:scale-[0.98] font-bold text-xs text-white rounded-lg transition-all duration-150 shadow-sm flex items-center justify-center gap-1.5"
+                      className="w-full py-2.5 min-h-[44px] bg-sky-600 hover:bg-sky-700 active:scale-[0.98] font-bold text-xs text-white rounded-lg transition-all duration-150 shadow-sm flex items-center justify-center gap-1.5"
                     >
                       <span>Vào Thách Đấu</span>
                       <ChevronRight className="w-3.5 h-3.5" />
@@ -438,11 +444,14 @@ export default function LobbyPage() {
           aria-labelledby="modal-title"
           className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4"
         >
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg p-6 sm:p-7 shadow-modal relative animate-in fade-in zoom-in-95 duration-150">
+          <div
+            ref={createModalRef}
+            className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg p-6 sm:p-7 shadow-modal relative animate-in fade-in zoom-in-95 duration-150"
+          >
             <button
               onClick={() => setShowCreateModal(false)}
               aria-label="Đóng cửa sổ tạo phòng"
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-colors"
+              className="absolute top-4 right-4 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -483,7 +492,7 @@ export default function LobbyPage() {
                         key={key}
                         type="button"
                         onClick={() => setSelectedTimeKey(key as keyof typeof TIME_CONTROLS)}
-                        className={`p-2.5 rounded-xl text-xs font-semibold border transition-all text-center ${
+                        className={`p-2.5 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-semibold border transition-all text-center ${
                           isSelected
                             ? 'bg-slate-900 border-slate-900 text-white font-bold shadow-subtle'
                             : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
@@ -513,7 +522,7 @@ export default function LobbyPage() {
                         key={c.key}
                         type="button"
                         onClick={() => setColorPref(c.key as any)}
-                        className={`p-2.5 rounded-xl text-xs font-semibold border transition-all text-center ${
+                        className={`p-2.5 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-semibold border transition-all text-center ${
                           isSelected
                             ? 'bg-slate-900 border-slate-900 text-white font-bold shadow-subtle'
                             : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
@@ -535,7 +544,7 @@ export default function LobbyPage() {
                   <button
                     type="button"
                     onClick={() => setVisibility('PUBLIC')}
-                    className={`p-2.5 rounded-xl text-xs font-semibold border transition-all text-center ${
+                    className={`p-2.5 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-semibold border transition-all text-center ${
                       visibility === 'PUBLIC'
                         ? 'bg-slate-900 border-slate-900 text-white font-bold shadow-subtle'
                         : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
@@ -546,7 +555,7 @@ export default function LobbyPage() {
                   <button
                     type="button"
                     onClick={() => setVisibility('PRIVATE')}
-                    className={`p-2.5 rounded-xl text-xs font-semibold border transition-all text-center ${
+                    className={`p-2.5 min-h-[44px] flex items-center justify-center rounded-xl text-xs font-semibold border transition-all text-center ${
                       visibility === 'PRIVATE'
                         ? 'bg-slate-900 border-slate-900 text-white font-bold shadow-subtle'
                         : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'

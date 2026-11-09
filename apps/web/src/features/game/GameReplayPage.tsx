@@ -81,7 +81,7 @@ export default function GameReplayPage() {
               <span className="text-xs px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 font-bold border border-sky-200/70">
                 {replayData.game.result}
               </span>
-              <div className="text-[10px] text-slate-400 mt-1 uppercase font-semibold">
+              <div className="text-[10px] text-slate-600 mt-1 uppercase font-semibold">
                 {replayData.game.terminationReason}
               </div>
             </div>
@@ -233,8 +233,8 @@ export default function GameReplayPage() {
                     <span className="font-bold text-slate-900 text-xs truncate max-w-[170px]">
                       Vs {opponent || 'Máy AI'}
                     </span>
-                    <span className="text-[10px] text-slate-400 flex items-center gap-1 font-mono tabular-nums">
-                      <Calendar className="w-3 h-3 text-slate-400" />
+                    <span className="text-[10px] text-slate-600 flex items-center gap-1 font-mono tabular-nums font-medium">
+                      <Calendar className="w-3 h-3 text-slate-500" />
                       {new Date(g.createdAt).toLocaleDateString('vi-VN')}
                     </span>
                   </div>

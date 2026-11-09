@@ -4,8 +4,8 @@ import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import { reconnectSocketWithAuth } from '../../services/socket';
 import { Mail, CheckCircle2, AlertCircle, ArrowRight, RefreshCw, ShieldCheck } from 'lucide-react';
-import confetti from 'canvas-confetti';
-import { PieceSvg } from '../game/AIGamePage';
+import { fireConfetti } from '../../lib/confetti';
+import { PieceSvg } from '../../components/chess/PieceSvg';
 
 export default function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
@@ -60,9 +60,9 @@ export default function VerifyEmailPage() {
         } else {
           updateUser({ isEmailVerified: true });
         }
-        // Fire confetti celebration
+        // Fire confetti celebration (with motion sensitivity check)
         try {
-          confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+          fireConfetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
         } catch {
           // ignore
         }
@@ -209,7 +209,7 @@ export default function VerifyEmailPage() {
                 required
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200/90 rounded-xl text-center text-slate-900 font-mono text-xl sm:text-2xl font-bold tracking-widest placeholder-slate-300 focus:outline-none focus:border-sky-500 focus:bg-white tabular-nums transition-colors"
               />
-              <p className="text-[11px] text-slate-400 mt-1.5 text-center">
+              <p className="text-[11px] text-slate-600 mt-1.5 text-center">
                 Mã xác minh gồm 6 số đã được gửi tới hòm thư của bạn và có hiệu lực 15 phút.
               </p>
             </div>

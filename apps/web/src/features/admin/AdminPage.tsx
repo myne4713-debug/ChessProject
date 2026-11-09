@@ -136,7 +136,7 @@ export default function AdminPage() {
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
+                  <td colSpan={6} className="text-center py-12 text-slate-500">
                     <div className="flex items-center justify-center gap-2">
                       <div className="w-5 h-5 border-2 border-sky-600 border-t-transparent rounded-full animate-spin" />
                       <span>Đang tải danh sách người dùng...</span>
@@ -145,7 +145,7 @@ export default function AdminPage() {
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
+                  <td colSpan={6} className="text-center py-12 text-slate-500">
                     Không tìm thấy tài khoản người dùng phù hợp.
                   </td>
                 </tr>
@@ -156,7 +156,7 @@ export default function AdminPage() {
                   return (
                     <tr key={u.id} className="hover:bg-slate-50/80 transition-colors duration-150">
                       <td className="px-4 py-3.5 font-bold text-slate-900">{u.username}</td>
-                      <td className="px-4 py-3.5 text-slate-500">{u.email}</td>
+                      <td className="px-4 py-3.5 text-slate-600 font-medium">{u.email}</td>
                       <td className="px-4 py-3.5">
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${

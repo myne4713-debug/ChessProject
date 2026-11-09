@@ -2,10 +2,11 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Chessboard } from 'react-chessboard';
 import { Chess, Square } from 'chess.js';
-import confetti from 'canvas-confetti';
+import { fireConfetti } from '../../lib/confetti';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import { soundManager } from '../../lib/sound';
+import { useDialogFocusTrap } from '../../hooks/useDialogFocusTrap';
 import {
   GameState,
   AIDifficulty,
@@ -35,101 +36,8 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { PromotionModal } from './components/PromotionModal';
-
-// Chess.com style piece vector icons for captured pieces & status badges
-export function PieceSvg({
-  type,
-  color,
-  className = 'w-4 h-4',
-}: {
-  type: string;
-  color: 'w' | 'b';
-  className?: string;
-}) {
-  const isWhite = color === 'w';
-  const fill = isWhite ? '#ffffff' : '#1e293b';
-  const stroke = isWhite ? '#475569' : '#0f172a';
-
-  switch (type.toLowerCase()) {
-    case 'p':
-      return (
-        <svg viewBox="0 0 45 45" className={className}>
-          <path
-            d="m 22.5,9 c -2.21,0 -4,1.79 -4,4 0,0.89 0.29,1.71 0.78,2.38 C 17.33,16.5 16,18.59 16,21 c 0,2.03 0.94,3.84 2.41,5.03 C 15.41,27.09 11,31.58 11,39.5 H 34 C 34,31.58 29.59,27.09 26.59,26.03 28.06,24.84 29,23.03 29,21 29,18.59 27.67,16.5 25.72,15.38 26.21,14.71 26.5,13.89 26.5,13 c 0,-2.21 -1.79,-4 -4,-4 z"
-            fill={fill}
-            stroke={stroke}
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
-      );
-    case 'n':
-      return (
-        <svg viewBox="0 0 45 45" className={className}>
-          <path
-            d="m 22,10 c 10.5,1 16.5,8 16,29 H 15 c 0,-9 10,-6.5 8,-21"
-            fill={fill}
-            stroke={stroke}
-            strokeWidth="1.5"
-          />
-          <path
-            d="m 24,18 c 0.38,2.91 -5.55,7.37 -8,9 -3,2 -2.82,4.34 -5,4 -1.042,-0.94 1.41,-3.04 0,-3 -1,0 0.19,1.23 -1,2 -1,0 -4.003,1 -4,-4 0,-2 6,-12 6,-12 0,0 1.89,-1.9 2,-3.5 -0.73,-0.994 -0.5,-2 -1,-3 3,0 6,1 8.5,4 1.5,1.5 2.5,4 2.5,6.5 z"
-            fill={fill}
-            stroke={stroke}
-            strokeWidth="1.5"
-          />
-        </svg>
-      );
-    case 'b':
-      return (
-        <svg viewBox="0 0 45 45" className={className}>
-          <g fill={fill} stroke={stroke} strokeWidth="1.5" strokeLinecap="round">
-            <path d="m 9,36 c 3.39,-0.97 10.11,0.43 13.5,-2 3.39,2.43 10.11,1.03 13.5,2 0,0 1.65,0.54 3,2 -0.68,0.97 -1.65,0.99 -3,1 -3.39,-0.97 -10.11,0.46 -13.5,-1 -3.39,1.46 -10.11,0.03 -13.5,1 -1.354,-0.01 -2.324,-0.03 -3,-1 1.35,-1.46 3,-2 3,-2 z" />
-            <path d="m 15,32 c 2.5,2.5 12.5,2.5 15,0 0.5,-1.5 0,-2 0,-2 0,-2.5 -2.5,-4 -2.5,-4 5.5,-1.5 6,-11.5 -5,-15.5 -11,4 -10.5,14 -5,15.5 0,0 -2.5,1.5 -2.5,4 0,0 -0.5,0.5 0,2 z" />
-            <path d="m 25,8 a 2.5,2.5 0 1 1 -5,0 2.5,2.5 0 1 1 5,0 z" />
-            <path
-              d="m 17.5,26 h 10 M 20,20 h 5 M 22.5,17.5 v 5"
-              stroke={isWhite ? '#475569' : '#ffffff'}
-            />
-          </g>
-        </svg>
-      );
-    case 'r':
-      return (
-        <svg viewBox="0 0 45 45" className={className}>
-          <g fill={fill} stroke={stroke} strokeWidth="1.5" strokeLinecap="round">
-            <path d="m 9,39 h 27 v -3 H 9 v 3 z m 3,-3 v -4 h 21 v 4 H 12 z m -1,-22 v -4 h 4 v 2 h 5 v -2 h 5 v 2 h 5 v -2 h 4 v 4 z m 2,1 v 17 h 17 v -17 z" />
-          </g>
-        </svg>
-      );
-    case 'q':
-      return (
-        <svg viewBox="0 0 45 45" className={className}>
-          <g fill={fill} stroke={stroke} strokeWidth="1.5" strokeLinecap="round">
-            <path d="m 9,26 c 8.5,-1.5 21,-1.5 27,0 l 2,-12 -7,11 -7,-14 -7,14 -7,-11 2,12 z" />
-            <path d="m 9,31 c 8,0 19,0 27,0 v 5 H 9 v -5 z" />
-            <circle cx="6" cy="12" r="2" />
-            <circle cx="14" cy="9" r="2" />
-            <circle cx="22.5" cy="8" r="2" />
-            <circle cx="31" cy="9" r="2" />
-            <circle cx="39" cy="12" r="2" />
-          </g>
-        </svg>
-      );
-    case 'k':
-      return (
-        <svg viewBox="0 0 45 45" className={className}>
-          <g fill={fill} stroke={stroke} strokeWidth="1.5" strokeLinecap="round">
-            <path d="m 22.5,11.63 v 6 M 20,13 h 5" stroke={stroke} />
-            <path d="m 22.5,25 c 0,0 4.5,-7.5 3,-10.5 -1.5,-3 -6,-3 -7.5,0 -1.5,3 3,10.5 3,10.5" />
-            <path d="m 11.5,37 c 5.5,3.5 15.5,3.5 21,0 v -7 c 0,0 9,-4.5 6,-10.5 -4,-8 -12,2 -16,2 -4,0 -12,-10 -16,-2 -3,6 6,10.5 6,10.5 v 7 z" />
-          </g>
-        </svg>
-      );
-    default:
-      return null;
-  }
-}
+import { PieceSvg } from '../../components/chess/PieceSvg';
+export { PieceSvg };
 
 export default function AIGamePage() {
   const navigate = useNavigate();
@@ -309,16 +217,11 @@ export default function AIGamePage() {
     }
   }, [gameState, navigate]);
 
-  // Handle ESC key to dismiss modal or exit
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && (showConfigModal || !gameState)) {
-        handleExitCreation();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showConfigModal, gameState, handleExitCreation]);
+  const isSetupModalOpen = showConfigModal || !gameState;
+  const configModalRef = useDialogFocusTrap<HTMLDivElement>({
+    isOpen: isSetupModalOpen,
+    onClose: handleExitCreation,
+  });
 
   // Initialize or Restart Game
   const handleStartGame = async () => {
@@ -435,7 +338,7 @@ export default function AIGamePage() {
             (moveRes.result === 'WHITE_WON' && orientation === 'white') ||
             (moveRes.result === 'BLACK_WON' && orientation === 'black')
           ) {
-            confetti({ particleCount: 90, spread: 70 });
+            fireConfetti({ particleCount: 90, spread: 70 });
           }
         }
       }
@@ -533,7 +436,7 @@ export default function AIGamePage() {
                 (moveRes.result === 'WHITE_WON' && isHumanWhite) ||
                 (moveRes.result === 'BLACK_WON' && !isHumanWhite)
               ) {
-                confetti({ particleCount: 100, spread: 80 });
+                fireConfetti({ particleCount: 100, spread: 80 });
               }
             } else {
               triggerAiResponse(gameState.id);
@@ -794,8 +697,11 @@ export default function AIGamePage() {
           ) : null}
 
           <button
+            type="button"
             onClick={() => setShowConfigModal(true)}
-            className="px-3.5 py-1.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-sky-500/20 transition-all flex items-center gap-1.5 active:scale-[0.96]"
+            aria-label="Bắt đầu ván cờ mới với máy AI"
+            title="Bắt đầu ván mới"
+            className="px-3.5 py-1.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-sky-500/20 transition-all flex items-center gap-1.5 active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-sky-500"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             Ván mới
@@ -944,7 +850,7 @@ export default function AIGamePage() {
                   <span className="text-[11px] font-mono font-semibold px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/80 tabular-nums">
                     {user?.eloRating || 1200}
                   </span>
-                  <span className="text-[11px] text-slate-400 font-normal">
+                  <span className="text-[11px] text-slate-600 font-medium">
                     ({orientation === 'white' ? 'Trắng' : 'Đen'})
                   </span>
                 </div>
@@ -987,18 +893,23 @@ export default function AIGamePage() {
           <div className="flex items-center justify-between gap-1.5 pt-0.5 text-xs">
             <div className="flex items-center gap-1.5">
               <button
+                type="button"
                 onClick={() => setOrientation((prev) => (prev === 'white' ? 'black' : 'white'))}
+                aria-label={`Xoay hướng bàn cờ (hiện đang là quân ${orientation === 'white' ? 'Trắng' : 'Đen'} ở phía dưới)`}
                 title="Xoay bàn cờ"
-                className="p-2 sm:px-3 sm:py-1.5 bg-white hover:bg-slate-50 text-slate-700 font-medium rounded-xl border border-slate-200 shadow-sm flex items-center gap-1.5 transition-all active:scale-95"
+                className="p-2 sm:px-3 sm:py-1.5 min-h-[38px] bg-white hover:bg-slate-50 text-slate-700 font-medium rounded-xl border border-slate-200 shadow-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-sky-500"
               >
                 <RotateCw className="w-3.5 h-3.5 text-slate-600" />
                 <span className="hidden sm:inline">Xoay bàn</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => setShowHints((prev) => !prev)}
+                aria-label={showHints ? 'Tắt gợi ý nước đi hợp lệ' : 'Bật gợi ý nước đi hợp lệ'}
+                aria-pressed={showHints}
                 title="Bật/tắt chấm gợi ý nước đi"
-                className={`p-2 sm:px-3 sm:py-1.5 font-medium rounded-xl border transition-all flex items-center gap-1.5 shadow-sm active:scale-95 ${
+                className={`p-2 sm:px-3 sm:py-1.5 min-h-[38px] font-medium rounded-xl border transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 focus-visible:ring-2 focus-visible:ring-sky-500 ${
                   showHints
                     ? 'bg-sky-50 border-sky-200 text-sky-800'
                     : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -1013,10 +924,12 @@ export default function AIGamePage() {
               </button>
 
               <button
+                type="button"
                 onClick={toggleSound}
                 aria-label={soundEnabled ? 'Tắt âm thanh ván đấu' : 'Bật âm thanh ván đấu'}
+                aria-pressed={soundEnabled}
                 title="Âm thanh ván đấu"
-                className={`p-2 sm:px-3 sm:py-1.5 font-medium rounded-xl border transition-all flex items-center gap-1.5 shadow-sm active:scale-95 ${
+                className={`p-2 sm:px-3 sm:py-1.5 min-h-[38px] font-medium rounded-xl border transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 focus-visible:ring-2 focus-visible:ring-sky-500 ${
                   soundEnabled
                     ? 'bg-sky-50 border-sky-200 text-sky-800'
                     : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -1031,9 +944,11 @@ export default function AIGamePage() {
               </button>
 
               <button
+                type="button"
                 onClick={() => setShowConfigModal(true)}
+                aria-label="Cài đặt cấp độ máy AI và thời gian ván đấu"
                 title="Cài đặt cấp độ & thời gian"
-                className="p-2 sm:px-3 sm:py-1.5 bg-white hover:bg-slate-50 text-slate-700 font-medium rounded-xl border border-slate-200 shadow-sm flex items-center gap-1.5 transition-all active:scale-95"
+                className="p-2 sm:px-3 sm:py-1.5 min-h-[38px] bg-white hover:bg-slate-50 text-slate-700 font-medium rounded-xl border border-slate-200 shadow-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-sky-500"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5 text-slate-600" />
                 <span className="hidden sm:inline">Cài đặt</span>
@@ -1042,9 +957,11 @@ export default function AIGamePage() {
 
             {gameState && gameState.status === 'IN_PROGRESS' && !gameOverResult && (
               <button
+                type="button"
                 onClick={handleResign}
+                aria-label="Đầu hàng và xin thua ván đấu với máy"
                 title="Xin thua ván đấu"
-                className="px-3 py-1.5 bg-white hover:bg-red-50 text-red-600 font-medium rounded-xl border border-red-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+                className="px-3 py-1.5 min-h-[38px] bg-white hover:bg-red-50 text-red-600 font-medium rounded-xl border border-red-200 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 focus-visible:ring-2 focus-visible:ring-red-500"
               >
                 <Flag className="w-3.5 h-3.5 text-red-500" />
                 <span>Xin thua</span>
@@ -1074,7 +991,7 @@ export default function AIGamePage() {
 
             {/* Visual Balance Bar */}
             <div className="space-y-1">
-              <div className="flex justify-between text-[11px] text-slate-400 font-medium">
+              <div className="flex justify-between text-[11px] text-slate-600 font-medium">
                 <span>⚪ Quân Trắng</span>
                 <span>Quân Đen ⚫</span>
               </div>
@@ -1095,13 +1012,13 @@ export default function AIGamePage() {
             {aiStats && (
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-                  <div className="text-[10px] text-slate-400">Độ sâu tính toán</div>
+                  <div className="text-[10px] text-slate-600 font-medium">Độ sâu tính toán</div>
                   <div className="font-bold text-slate-800 text-xs mt-0.5">
                     {aiStats.depth} nước đi
                   </div>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-                  <div className="text-[10px] text-slate-400">Thời gian phản hồi</div>
+                  <div className="text-[10px] text-slate-600 font-medium">Thời gian phản hồi</div>
                   <div className="font-bold text-slate-800 text-xs mt-0.5">
                     {aiStats.durationMs} ms
                   </div>
@@ -1117,7 +1034,7 @@ export default function AIGamePage() {
                 <BookOpen className="w-4 h-4 text-sky-600" />
                 Lịch Sử Nước Đi ({moveHistory.length})
               </span>
-              <span className="text-xs text-slate-400 font-mono">
+              <span className="text-xs text-slate-600 font-mono font-medium">
                 Nước #{Math.ceil(moveHistory.length / 2) || 1}
               </span>
             </div>
@@ -1128,10 +1045,10 @@ export default function AIGamePage() {
               className="flex-1 overflow-y-auto mt-2 space-y-0.5 text-xs pr-1"
             >
               {moveHistory.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs py-8">
-                  <Swords className="w-7 h-7 text-slate-200 mb-2" />
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs py-8">
+                  <Swords className="w-7 h-7 text-slate-300 mb-2" />
                   <span>Ván cờ chưa có nước đi nào</span>
-                  <span className="text-[11px] text-slate-400 mt-0.5">
+                  <span className="text-[11px] text-slate-600 mt-0.5 font-medium">
                     Chọn một quân cờ để bắt đầu đi
                   </span>
                 </div>
@@ -1153,7 +1070,7 @@ export default function AIGamePage() {
                             : 'hover:bg-slate-50 text-slate-700'
                         }`}
                       >
-                        <span className="w-7 text-slate-400 font-medium">{i + 1}.</span>
+                        <span className="w-7 text-slate-600 font-semibold">{i + 1}.</span>
                         <span className="w-20 font-mono tabular-nums font-medium">{whiteM?.san}</span>
                         <span className="flex-1 font-mono tabular-nums font-medium text-slate-600">
                           {blackM?.san || ''}
@@ -1168,13 +1085,17 @@ export default function AIGamePage() {
         </div>
       </div>
 
-      {/* Setup New Game Modal (Thân thiện, ấm áp) */}
-      {(showConfigModal || !gameState) && (
+      {/* Setup New Game Modal */}
+      {isSetupModalOpen && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="setup-dialog-title"
           onClick={handleExitCreation}
           className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
         >
           <div
+            ref={configModalRef}
             onClick={(e) => e.stopPropagation()}
             className="bg-white rounded-3xl w-full max-w-lg p-6 md:p-8 shadow-2xl relative animate-in fade-in zoom-in duration-150 border border-slate-100 cursor-default"
           >
@@ -1193,7 +1114,7 @@ export default function AIGamePage() {
                 <PieceSvg type="k" color="w" className="w-7 h-7" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-slate-900">Thiết Lập Ván Đấu Mới</h3>
+                <h3 id="setup-dialog-title" className="text-xl font-bold text-slate-900">Thiết Lập Ván Đấu Mới</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Tùy chỉnh cấp độ máy, thời gian và màu quân cờ
                 </p>
@@ -1234,6 +1155,7 @@ export default function AIGamePage() {
                       key={d.key}
                       type="button"
                       onClick={() => setDifficulty(d.key as AIDifficulty)}
+                      aria-pressed={difficulty === d.key}
                       className={`p-3 rounded-2xl text-left border transition-all ${
                         difficulty === d.key
                           ? 'bg-sky-50 border-sky-400 ring-2 ring-sky-100 text-sky-950 shadow-sm'
@@ -1283,6 +1205,7 @@ export default function AIGamePage() {
                       key={c.key}
                       type="button"
                       onClick={() => setPlayerColor(c.key as any)}
+                      aria-pressed={playerColor === c.key}
                       className={`p-3 rounded-2xl border transition-all text-center flex flex-col items-center justify-center ${
                         playerColor === c.key
                           ? 'bg-sky-50 border-sky-400 ring-2 ring-sky-100 text-sky-950 font-semibold shadow-sm'
@@ -1308,6 +1231,7 @@ export default function AIGamePage() {
                       key={key}
                       type="button"
                       onClick={() => setSelectedTimeKey(key as keyof typeof TIME_CONTROLS)}
+                      aria-pressed={selectedTimeKey === key}
                       className={`p-2.5 rounded-xl text-xs font-semibold border transition-all text-center ${
                         selectedTimeKey === key
                           ? 'bg-sky-50 border-sky-400 text-sky-800 font-bold shadow-sm'

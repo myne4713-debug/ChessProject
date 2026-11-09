@@ -7,7 +7,7 @@ import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import { reconnectSocketWithAuth } from '../../services/socket';
 import { Lock, User, Eye, EyeOff, AlertCircle, ShieldAlert } from 'lucide-react';
-import { PieceSvg } from '../game/AIGamePage';
+import { PieceSvg } from '../../components/chess/PieceSvg';
 import GoogleLoginButton from '../../components/auth/GoogleLoginButton';
 
 export default function LoginPage() {
@@ -95,7 +95,7 @@ export default function LoginPage() {
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-200" />
             </div>
-            <div className="relative flex justify-center text-[11px] font-semibold text-slate-400">
+            <div className="relative flex justify-center text-[11px] font-semibold text-slate-600">
               <span className="bg-white px-3">Hoặc tiếp tục với tài khoản riêng</span>
             </div>
           </div>

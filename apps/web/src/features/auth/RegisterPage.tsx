@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema, RegisterInput } from '@online-chess/shared';
 import { api } from '../../services/api';
 import { Lock, User, Mail, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { PieceSvg } from '../game/AIGamePage';
+import { PieceSvg } from '../../components/chess/PieceSvg';
 import GoogleLoginButton from '../../components/auth/GoogleLoginButton';
 
 export default function RegisterPage() {
@@ -71,7 +71,7 @@ export default function RegisterPage() {
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-200" />
             </div>
-            <div className="relative flex justify-center text-[11px] font-semibold text-slate-400">
+            <div className="relative flex justify-center text-[11px] font-semibold text-slate-600">
               <span className="bg-white px-3">Hoặc điền biểu mẫu dưới đây</span>
             </div>
           </div>

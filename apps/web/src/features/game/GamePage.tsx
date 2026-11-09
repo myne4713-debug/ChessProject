@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
-import confetti from 'canvas-confetti';
+import { fireConfetti } from '../../lib/confetti';
 import { api } from '../../services/api';
 import { getSocket } from '../../services/socket';
 import { useAuthStore } from '../../stores/authStore';
 import { soundManager } from '../../lib/sound';
+import { useDialogFocusTrap } from '../../hooks/useDialogFocusTrap';
 import {
   GameState,
   MoveResultPayload,
@@ -32,7 +33,7 @@ import {
   Share2,
   Swords,
 } from 'lucide-react';
-import { PieceSvg } from './AIGamePage';
+import { PieceSvg } from '../../components/chess/PieceSvg';
 import { PromotionModal } from './components/PromotionModal';
 
 export default function GamePage() {
@@ -74,6 +75,20 @@ export default function GamePage() {
     to: string;
     color: 'w' | 'b';
   } | null>(null);
+
+  const drawModalRef = useDialogFocusTrap<HTMLDivElement>({
+    isOpen: !!incomingDrawOffer,
+    onClose: () => handleRejectDraw(),
+  });
+
+  const resignModalRef = useDialogFocusTrap<HTMLDivElement>({
+    isOpen: showResignModal,
+    onClose: () => setShowResignModal(false),
+  });
+
+  const gameOverModalRef = useDialogFocusTrap<HTMLDivElement>({
+    isOpen: !!gameOverData,
+  });
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const moveHistoryContainerRef = useRef<HTMLDivElement>(null);
@@ -265,7 +280,7 @@ export default function GamePage() {
       setGameOverData(payload);
       soundManager.play('gameover');
       if (payload.winnerId === user?.id) {
-        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        fireConfetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
       }
     };
 
@@ -735,14 +750,14 @@ export default function GamePage() {
                     }`}
                   >
                     {m.ply % 2 !== 0 && (
-                      <span className="text-slate-400 mr-2">{Math.ceil(m.ply / 2)}.</span>
+                      <span className="text-slate-600 mr-2 font-medium">{Math.ceil(m.ply / 2)}.</span>
                     )}
                     <span>{m.san}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-slate-400 text-center py-8">Chưa có nước đi nào</p>
+              <p className="text-xs text-slate-600 text-center py-8 font-medium">Chưa có nước đi nào</p>
             )}
           </div>
         </div>
@@ -759,7 +774,7 @@ export default function GamePage() {
             className="flex-1 overflow-y-auto my-3 space-y-2.5 text-xs pr-1"
           >
             {chatMessages.length === 0 ? (
-              <p className="text-center text-slate-400 py-8">Gửi lời chào tới đối thủ...</p>
+              <p className="text-center text-slate-600 py-8 font-medium">Gửi lời chào tới đối thủ...</p>
             ) : (
               chatMessages.map((msg) => (
                 <div
@@ -808,11 +823,15 @@ export default function GamePage() {
         <div
           role="dialog"
           aria-modal="true"
+          aria-labelledby="draw-dialog-title"
           className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4"
         >
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 text-center shadow-modal animate-in fade-in zoom-in-95 duration-150">
+          <div
+            ref={drawModalRef}
+            className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 text-center shadow-modal animate-in fade-in zoom-in-95 duration-150"
+          >
             <Handshake className="w-12 h-12 text-amber-500 mx-auto mb-3" />
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Đối Thủ Đề Nghị Hòa</h3>
+            <h3 id="draw-dialog-title" className="text-lg font-bold text-slate-900 mb-2">Đối Thủ Đề Nghị Hòa</h3>
             <p className="text-xs text-slate-500 mb-6 leading-relaxed">
               Kỳ thủ <strong className="text-slate-800">{incomingDrawOffer}</strong> muốn kết thúc trận đấu với kết quả hòa. Bạn có đồng ý không?
             </p>
@@ -839,11 +858,15 @@ export default function GamePage() {
         <div
           role="dialog"
           aria-modal="true"
+          aria-labelledby="resign-dialog-title"
           className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4"
         >
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 text-center shadow-modal animate-in fade-in zoom-in-95 duration-150">
+          <div
+            ref={resignModalRef}
+            className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 text-center shadow-modal animate-in fade-in zoom-in-95 duration-150"
+          >
             <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-3" />
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Xác Nhận Đầu Hàng?</h3>
+            <h3 id="resign-dialog-title" className="text-lg font-bold text-slate-900 mb-2">Xác Nhận Đầu Hàng?</h3>
             <p className="text-xs text-slate-500 mb-6 leading-relaxed">
               Bạn có chắc chắn muốn đầu hàng không? Điểm ELO của bạn sẽ bị trừ sau khi chấp nhận thua ván này.
             </p>
@@ -870,14 +893,18 @@ export default function GamePage() {
         <div
           role="dialog"
           aria-modal="true"
+          aria-labelledby="gameover-dialog-title"
           className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4"
         >
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-modal animate-in fade-in zoom-in-95 duration-200">
+          <div
+            ref={gameOverModalRef}
+            className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-modal animate-in fade-in zoom-in-95 duration-200"
+          >
             <div className="w-16 h-16 bg-sky-50 border border-sky-200 rounded-2xl mx-auto flex items-center justify-center mb-4">
               <Trophy className="w-8 h-8 text-sky-600" />
             </div>
 
-            <h2 className="text-2xl font-extrabold text-slate-900 mb-1 tracking-tight">
+            <h2 id="gameover-dialog-title" className="text-2xl font-extrabold text-slate-900 mb-1 tracking-tight">
               Trận Đấu Kết Thúc
             </h2>
             <div className="text-lg font-bold text-sky-600 mb-1">

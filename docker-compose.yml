@@ -45,6 +45,7 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-Online Chess <no-reply@onlinechess.local>}
       CLIENT_APP_URL: ${CLIENT_APP_URL:-http://localhost:5173}
+      AI_TASK_TIMEOUT_MS: ${AI_TASK_TIMEOUT_MS:-12000}
     depends_on:
       postgres:
         condition: service_healthy

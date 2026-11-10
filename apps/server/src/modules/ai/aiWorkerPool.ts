@@ -42,9 +42,10 @@ export class AIWorkerPool {
     taskTimeoutMs?: number;
   }) {
     const cpus = os.cpus()?.length || 2;
-    this.poolSize = options?.poolSize ?? Math.max(1, Math.min(4, cpus - 1));
+    this.poolSize = options?.poolSize ?? Math.max(1, Math.min(4, cpus > 1 ? cpus - 1 : 1));
     this.maxQueueSize = options?.maxQueueSize ?? 50;
-    this.taskTimeoutMs = options?.taskTimeoutMs ?? 8000;
+    const envTimeout = process.env.AI_TASK_TIMEOUT_MS ? parseInt(process.env.AI_TASK_TIMEOUT_MS, 10) : 12000;
+    this.taskTimeoutMs = options?.taskTimeoutMs ?? envTimeout;
   }
 
   private resolveWorkerPath(): string | null {
@@ -283,5 +284,10 @@ export async function runAIMoveInWorker(
   fen: string,
   difficulty: AIDifficulty
 ): Promise<AIChessMove> {
-  return aiWorkerPool.executeMove(fen, difficulty);
+  try {
+    return await aiWorkerPool.executeMove(fen, difficulty);
+  } catch (error: any) {
+    logger.warn(error, 'AI Worker pool task failed or timed out. Falling back to resilient emergency in-process move');
+    return await chessAI.chooseMove(fen, 'EASY');
+  }
 }

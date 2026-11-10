@@ -91,7 +91,7 @@ export interface IChessAI {
     isMaximizing: boolean,
     ply: number
   ): number;
-  orderMoves(chess: Chess, moves: Move[]): Move[];
+  orderMoves(chess: Chess, moves: Move[], pvMove?: Move | null): Move[];
   getSearchStatistics(): AISearchStats;
 }
 
@@ -109,6 +109,7 @@ export class CustomChessAI implements IChessAI {
   };
 
   private bestMoveAtRoot: Move | null = null;
+  private pvMove: Move | null = null;
   private timeLimitMs = 3000;
   private startTime = 0;
   private isTimeout = false;
@@ -188,8 +189,14 @@ export class CustomChessAI implements IChessAI {
     return whiteScore - blackScore;
   }
 
-  orderMoves(chess: Chess, moves: Move[]): Move[] {
+  orderMoves(chess: Chess, moves: Move[], pvMove?: Move | null): Move[] {
     return moves.sort((a, b) => {
+      // Prioritize the Principal Variation (PV) move from previous iterative deepening step
+      if (pvMove) {
+        if (a.from === pvMove.from && a.to === pvMove.to) return -10000;
+        if (b.from === pvMove.from && b.to === pvMove.to) return 10000;
+      }
+
       let scoreA = 0;
       let scoreB = 0;
 
@@ -210,8 +217,8 @@ export class CustomChessAI implements IChessAI {
       if (b.promotion) scoreB += 800;
 
       // Checks
-      if (a.san.includes('+')) scoreA += 50;
-      if (b.san.includes('+')) scoreB += 50;
+      if (a.san && a.san.includes('+')) scoreA += 50;
+      if (b.san && b.san.includes('+')) scoreB += 50;
 
       return scoreB - scoreA;
     });
@@ -232,6 +239,14 @@ export class CustomChessAI implements IChessAI {
       return standPat;
     }
 
+    // Fast bitwise time limit guard every 128 nodes
+    if ((this.stats.nodesVisited & 127) === 0) {
+      if (Date.now() - this.startTime > this.timeLimitMs) {
+        this.isTimeout = true;
+        return standPat;
+      }
+    }
+
     if (isMaximizing) {
       if (standPat >= beta) return beta;
       if (standPat > alpha) alpha = standPat;
@@ -247,12 +262,13 @@ export class CustomChessAI implements IChessAI {
         const score = this.quiescence(chess, alpha, beta, false, qply + 1);
         chess.undo();
 
+        if (this.isTimeout) break;
+
         if (score >= beta) {
           this.stats.nodesPruned++;
           return beta;
         }
         if (score > alpha) alpha = score;
-        if (this.isTimeout) break;
       }
       return alpha;
     } else {
@@ -270,12 +286,13 @@ export class CustomChessAI implements IChessAI {
         const score = this.quiescence(chess, alpha, beta, true, qply + 1);
         chess.undo();
 
+        if (this.isTimeout) break;
+
         if (score <= alpha) {
           this.stats.nodesPruned++;
           return alpha;
         }
         if (score < beta) beta = score;
-        if (this.isTimeout) break;
       }
       return beta;
     }
@@ -291,8 +308,8 @@ export class CustomChessAI implements IChessAI {
   ): number {
     this.stats.nodesVisited++;
 
-    // Time limit guard
-    if (this.stats.nodesVisited % 1000 === 0) {
+    // Fast bitwise time limit guard every 128 nodes
+    if ((this.stats.nodesVisited & 127) === 0) {
       if (Date.now() - this.startTime > this.timeLimitMs) {
         this.isTimeout = true;
       }
@@ -318,7 +335,7 @@ export class CustomChessAI implements IChessAI {
       return 0;
     }
 
-    const orderedMoves = this.orderMoves(chess, legalMoves);
+    const orderedMoves = this.orderMoves(chess, legalMoves, ply === 0 ? this.pvMove : null);
 
     if (isMaximizing) {
       let maxEval = -Infinity;
@@ -326,6 +343,8 @@ export class CustomChessAI implements IChessAI {
         chess.move(move);
         const evalScore = this.search(chess, depth - 1, alpha, beta, false, ply + 1);
         chess.undo();
+
+        if (this.isTimeout) break;
 
         if (evalScore > maxEval) {
           maxEval = evalScore;
@@ -339,8 +358,6 @@ export class CustomChessAI implements IChessAI {
           this.stats.nodesPruned++;
           break; // Beta cutoff
         }
-
-        if (this.isTimeout) break;
       }
       return maxEval;
     } else {
@@ -349,6 +366,8 @@ export class CustomChessAI implements IChessAI {
         chess.move(move);
         const evalScore = this.search(chess, depth - 1, alpha, beta, true, ply + 1);
         chess.undo();
+
+        if (this.isTimeout) break;
 
         if (evalScore < minEval) {
           minEval = evalScore;
@@ -362,8 +381,6 @@ export class CustomChessAI implements IChessAI {
           this.stats.nodesPruned++;
           break; // Alpha cutoff
         }
-
-        if (this.isTimeout) break;
       }
       return minEval;
     }
@@ -378,7 +395,7 @@ export class CustomChessAI implements IChessAI {
     }
 
     let depth = 3;
-    let timeLimit = 3000;
+    let timeLimit = 2500;
     let randomness = 0;
 
     switch (difficulty) {
@@ -394,7 +411,7 @@ export class CustomChessAI implements IChessAI {
         break;
       case 'HARD':
         depth = 4;
-        timeLimit = 5000;
+        timeLimit = 4000;
         randomness = 0;
         break;
     }
@@ -411,6 +428,7 @@ export class CustomChessAI implements IChessAI {
       bestMove: '',
     };
     this.bestMoveAtRoot = null;
+    this.pvMove = null;
 
     // In Easy mode, if random chance hits, pick a random legal move
     if (randomness > 0 && Math.random() < randomness) {
@@ -433,19 +451,44 @@ export class CustomChessAI implements IChessAI {
     }
 
     const isWhite = chess.turn() === 'w';
+    let chosen: Move = legalMoves[0];
+    let bestScore = 0;
 
-    // Minimax search with Alpha-Beta pruning
-    const bestScore = this.search(chess, depth, -Infinity, Infinity, isWhite, 0);
+    // Iterative Deepening: progressively explore depths 1 to target depth
+    for (let currentDepth = 1; currentDepth <= depth; currentDepth++) {
+      // Don't start deeper search if more than 65% of budget already spent
+      if (currentDepth > 1 && Date.now() - this.startTime > this.timeLimitMs * 0.65) {
+        break;
+      }
 
-    const chosen = this.bestMoveAtRoot || legalMoves[0];
+      this.bestMoveAtRoot = null;
+      const score = this.search(chess, currentDepth, -Infinity, Infinity, isWhite, 0);
+
+      if (!this.isTimeout && this.bestMoveAtRoot) {
+        chosen = this.bestMoveAtRoot;
+        bestScore = score;
+        this.pvMove = this.bestMoveAtRoot;
+        this.stats.depth = currentDepth;
+      } else if (this.isTimeout) {
+        if (!this.pvMove && this.bestMoveAtRoot) {
+          chosen = this.bestMoveAtRoot;
+          bestScore = score;
+        }
+        break;
+      }
+    }
+
+    if (this.stats.depth === 0) {
+      this.stats.depth = depth;
+    }
+
     const durationMs = Date.now() - this.startTime;
-
     this.stats.durationMs = durationMs;
     this.stats.score = bestScore;
     this.stats.bestMove = chosen.san;
 
     logger.info(
-      `AI (${difficulty}) chose ${chosen.san} [depth: ${depth}, nodes: ${this.stats.nodesVisited}, pruned: ${this.stats.nodesPruned}, duration: ${durationMs}ms, score: ${bestScore}]`
+      `AI (${difficulty}) chose ${chosen.san} [depth: ${this.stats.depth}, nodes: ${this.stats.nodesVisited}, pruned: ${this.stats.nodesPruned}, duration: ${durationMs}ms, score: ${bestScore}]`
     );
 
     return {

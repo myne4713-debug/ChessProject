@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Chessboard } from 'react-chessboard';
-import { Chess } from 'chess.js';
+import { Chess, Square } from 'chess.js';
 import { fireConfetti } from '../../lib/confetti';
 import { api } from '../../services/api';
 import { getSocket } from '../../services/socket';
 import { useAuthStore } from '../../stores/authStore';
 import { soundManager } from '../../lib/sound';
 import { useDialogFocusTrap } from '../../hooks/useDialogFocusTrap';
+import { findKingSquare } from '../../lib/chessUtils';
 import {
   GameState,
   MoveResultPayload,
@@ -32,6 +33,8 @@ import {
   Check,
   Share2,
   Swords,
+  Lightbulb,
+  ShieldAlert,
 } from 'lucide-react';
 import { PieceSvg } from '../../components/chess/PieceSvg';
 import { PromotionModal } from './components/PromotionModal';
@@ -75,6 +78,13 @@ export default function GamePage() {
     to: string;
     color: 'w' | 'b';
   } | null>(null);
+
+  // Legal moves & check highlights
+  const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
+  const [possibleMoves, setPossibleMoves] = useState<Square[]>([]);
+  const [captureMoves, setCaptureMoves] = useState<Set<Square>>(new Set());
+  const [showHints, setShowHints] = useState(true);
+  const [isCheck, setIsCheck] = useState(false);
 
   const drawModalRef = useDialogFocusTrap<HTMLDivElement>({
     isOpen: !!incomingDrawOffer,
@@ -217,6 +227,10 @@ export default function GamePage() {
         setGameState(res.data.state);
         setBoardFen(res.data.state.currentFen);
         localChessRef.current = new Chess(res.data.state.currentFen);
+        setIsCheck(res.data.state.isCheck ?? localChessRef.current.inCheck());
+        setSelectedSquare(null);
+        setPossibleMoves([]);
+        setCaptureMoves(new Set());
         syncClocks(
           res.data.state.whiteRemainingMs,
           res.data.state.blackRemainingMs,
@@ -231,6 +245,10 @@ export default function GamePage() {
     const handleMoveResult = (payload: MoveResultPayload) => {
       setBoardFen(payload.fen);
       localChessRef.current = new Chess(payload.fen);
+      setIsCheck(payload.isCheck ?? localChessRef.current.inCheck());
+      setSelectedSquare(null);
+      setPossibleMoves([]);
+      setCaptureMoves(new Set());
       syncClocks(payload.whiteRemainingMs, payload.blackRemainingMs, payload.currentTurn);
       setLastMoveSquares({ from: payload.move.fromSquare, to: payload.move.toSquare });
 
@@ -278,6 +296,10 @@ export default function GamePage() {
 
     const handleGameOver = (payload: GameOverPayload) => {
       setGameOverData(payload);
+      setIsCheck(false);
+      setSelectedSquare(null);
+      setPossibleMoves([]);
+      setCaptureMoves(new Set());
       soundManager.play('gameover');
       if (payload.winnerId === user?.id) {
         fireConfetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
@@ -367,7 +389,12 @@ export default function GamePage() {
         promotion,
       });
       if (!moveAttempt) return false;
-      localChessRef.current.undo();
+
+      // Optimistically update board and check status
+      setBoardFen(localChessRef.current.fen());
+      setIsCheck(localChessRef.current.inCheck());
+      setLastMoveSquares({ from: sourceSquare, to: targetSquare });
+
       if (moveAttempt.captured) {
         soundManager.play('capture');
       } else {
@@ -392,6 +419,7 @@ export default function GamePage() {
           if (gameState) {
             setBoardFen(gameState.currentFen);
             localChessRef.current = new Chess(gameState.currentFen);
+            setIsCheck(localChessRef.current.inCheck());
           }
         }
       }
@@ -400,11 +428,15 @@ export default function GamePage() {
     return true;
   };
 
-  const onPieceDrop = (sourceSquare: string, targetSquare: string) => {
-    if (!isPlayer || !gameId || gameOverData) return false;
+  const onPieceDrop = (sourceSquare: string, targetSquare: string): boolean => {
+    setSelectedSquare(null);
+    setPossibleMoves([]);
+    setCaptureMoves(new Set());
+
+    if (!isPlayer || !gameId || gameOverData || !isMyTurn) return false;
 
     // Detect pawn promotion to last rank
-    const piece = localChessRef.current.get(sourceSquare as any);
+    const piece = localChessRef.current.get(sourceSquare as Square);
     const isPawnPromotion =
       piece &&
       piece.type === 'p' &&
@@ -428,6 +460,64 @@ export default function GamePage() {
     }
 
     return dispatchMove(sourceSquare, targetSquare, 'q');
+  };
+
+  const handleSquareClick = (square: Square) => {
+    if (!isPlayer || !gameId || gameOverData || !isMyTurn) return;
+
+    const myColor = isWhitePlayer ? 'w' : 'b';
+
+    // If a piece is already selected and target square is a legal destination -> Move!
+    if (selectedSquare && possibleMoves.includes(square)) {
+      const piece = localChessRef.current.get(selectedSquare);
+      const isPawnPromotion =
+        piece &&
+        piece.type === 'p' &&
+        ((piece.color === 'w' && square.endsWith('8')) ||
+          (piece.color === 'b' && square.endsWith('1')));
+
+      if (isPawnPromotion) {
+        setPendingPromotion({ from: selectedSquare, to: square, color: piece.color });
+        setSelectedSquare(null);
+        setPossibleMoves([]);
+        setCaptureMoves(new Set());
+        return;
+      }
+
+      dispatchMove(selectedSquare, square, 'q');
+      setSelectedSquare(null);
+      setPossibleMoves([]);
+      setCaptureMoves(new Set());
+      return;
+    }
+
+    // Check if clicked square has a piece belonging to the current player
+    const piece = localChessRef.current.get(square);
+    if (piece && piece.color === myColor) {
+      setSelectedSquare(square);
+      const moves = localChessRef.current.moves({ square, verbose: true });
+      setPossibleMoves(moves.map((m) => m.to as Square));
+      setCaptureMoves(new Set(moves.filter((m) => !!m.captured).map((m) => m.to as Square)));
+    } else {
+      // Clicked on empty square or opponent piece without valid selection -> Deselect
+      setSelectedSquare(null);
+      setPossibleMoves([]);
+      setCaptureMoves(new Set());
+    }
+  };
+
+  const handlePieceDragBegin = (_piece: string, sourceSquare: Square) => {
+    if (!isPlayer || !gameId || gameOverData || !isMyTurn) return;
+
+    const myColor = isWhitePlayer ? 'w' : 'b';
+    const pieceObj = localChessRef.current.get(sourceSquare);
+
+    if (pieceObj && pieceObj.color === myColor) {
+      setSelectedSquare(sourceSquare);
+      const moves = localChessRef.current.moves({ square: sourceSquare, verbose: true });
+      setPossibleMoves(moves.map((m) => m.to as Square));
+      setCaptureMoves(new Set(moves.filter((m) => !!m.captured).map((m) => m.to as Square)));
+    }
   };
 
   const handlePromotionSelect = (promPiece: 'q' | 'r' | 'b' | 'n') => {
@@ -484,19 +574,68 @@ export default function GamePage() {
     ((gameState?.currentTurn === 'w' && isWhitePlayer) ||
       (gameState?.currentTurn === 'b' && isBlackPlayer));
 
-  // Custom square highlighting for last move
+  // Custom square highlighting for moves, selection, hints & king in check
   const customSquareStyles: Record<string, React.CSSProperties> = {};
+
+  // 1. Last move squares highlight (gentle sky blue warmth)
   if (lastMoveSquares.from) {
-    customSquareStyles[lastMoveSquares.from] = { backgroundColor: 'rgba(56, 189, 248, 0.35)' };
+    customSquareStyles[lastMoveSquares.from] = { backgroundColor: 'rgba(56, 189, 248, 0.25)' };
   }
   if (lastMoveSquares.to) {
-    customSquareStyles[lastMoveSquares.to] = { backgroundColor: 'rgba(56, 189, 248, 0.45)' };
+    customSquareStyles[lastMoveSquares.to] = { backgroundColor: 'rgba(56, 189, 248, 0.38)' };
+  }
+
+  // 2. Selected square highlight
+  if (selectedSquare) {
+    customSquareStyles[selectedSquare] = {
+      backgroundColor: 'rgba(14, 165, 233, 0.32)',
+      boxShadow: 'inset 0 0 0 2px #0284c7',
+    };
+  }
+
+  // 3. Legal move dots & capture rings
+  if (showHints) {
+    possibleMoves.forEach((sq) => {
+      const isCapture = captureMoves.has(sq);
+      if (isCapture) {
+        // Warm red target circle around enemy piece
+        customSquareStyles[sq] = {
+          background:
+            'radial-gradient(circle, transparent 56%, rgba(239, 68, 68, 0.65) 57%, rgba(239, 68, 68, 0.65) 72%, transparent 73%)',
+          cursor: 'pointer',
+          borderRadius: '50%',
+        };
+      } else {
+        // Soft blue circular dot on empty square
+        customSquareStyles[sq] = {
+          background:
+            'radial-gradient(circle, rgba(14, 165, 233, 0.75) 23%, transparent 24%)',
+          cursor: 'pointer',
+          borderRadius: '50%',
+        };
+      }
+    });
+  }
+
+  // 4. King in check highlight (red radial spotlight)
+  if (isCheck) {
+    const checkedTurn = localChessRef.current.turn();
+    const kingSq = findKingSquare(localChessRef.current, checkedTurn);
+    if (kingSq) {
+      customSquareStyles[kingSq] = {
+        background:
+          'radial-gradient(ellipse at center, rgba(239, 68, 68, 0.9) 0%, rgba(239, 68, 68, 0.45) 50%, transparent 80%)',
+      };
+    }
   }
 
   const isTopPlayerTurn =
     gameState?.currentTurn === (orientation === 'white' ? 'b' : 'w') && !gameOverData;
   const isBottomPlayerTurn =
     gameState?.currentTurn === (orientation === 'white' ? 'w' : 'b') && !gameOverData;
+
+  const isTopInCheck = isCheck && gameState?.currentTurn === (orientation === 'white' ? 'b' : 'w');
+  const isBottomInCheck = isCheck && gameState?.currentTurn === (orientation === 'white' ? 'w' : 'b');
 
   const topClockMs = orientation === 'white' ? blackClockMs : whiteClockMs;
   const bottomClockMs = orientation === 'white' ? whiteClockMs : blackClockMs;
@@ -569,7 +708,9 @@ export default function GamePage() {
         {/* Top Player (Opponent) */}
         <div
           className={`p-3.5 sm:p-4 rounded-2xl border flex items-center justify-between transition-all duration-150 ${
-            isTopPlayerTurn
+            isTopInCheck && !gameOverData
+              ? 'bg-rose-50/70 border-rose-400 shadow-card ring-1 ring-rose-300'
+              : isTopPlayerTurn
               ? 'bg-sky-50/90 border-sky-400 shadow-card ring-1 ring-sky-300'
               : 'bg-white border-slate-200/80 shadow-subtle'
           }`}
@@ -579,10 +720,18 @@ export default function GamePage() {
               <PieceSvg type="k" color={orientation === 'white' ? 'b' : 'w'} className="w-6 h-6" />
             </div>
             <div>
-              <div className="font-bold text-slate-900 text-sm">
-                {orientation === 'white'
-                  ? gameState?.blackPlayerName || 'Đối thủ'
-                  : gameState?.whitePlayerName || 'Đối thủ'}
+              <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <span>
+                  {orientation === 'white'
+                    ? gameState?.blackPlayerName || 'Đối thủ'
+                    : gameState?.whitePlayerName || 'Đối thủ'}
+                </span>
+                {isTopInCheck && !gameOverData && (
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full animate-pulse">
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    Chiếu tướng!
+                  </span>
+                )}
               </div>
               <div className="text-xs text-slate-500 font-mono tabular-nums">
                 ELO:{' '}
@@ -613,6 +762,8 @@ export default function GamePage() {
           <Chessboard
             position={boardFen}
             onPieceDrop={onPieceDrop}
+            onSquareClick={handleSquareClick}
+            onPieceDragBegin={handlePieceDragBegin}
             boardOrientation={orientation}
             arePiecesDraggable={isPlayer && !gameOverData && isMyTurn}
             customBoardStyle={{
@@ -628,7 +779,9 @@ export default function GamePage() {
         {/* Bottom Player (You) */}
         <div
           className={`p-3.5 sm:p-4 rounded-2xl border flex items-center justify-between transition-all duration-150 ${
-            isBottomPlayerTurn
+            isBottomInCheck && !gameOverData
+              ? 'bg-rose-50/70 border-rose-400 shadow-card ring-1 ring-rose-300'
+              : isBottomPlayerTurn
               ? 'bg-sky-50/90 border-sky-400 shadow-card ring-1 ring-sky-300'
               : 'bg-white border-slate-200/80 shadow-subtle'
           }`}
@@ -647,6 +800,12 @@ export default function GamePage() {
                 <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200/70 font-semibold">
                   Bạn
                 </span>
+                {isBottomInCheck && !gameOverData && (
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full animate-pulse">
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    Bạn đang bị chiếu!
+                  </span>
+                )}
               </div>
               <div className="text-xs text-slate-500 font-mono tabular-nums">
                 ELO:{' '}
@@ -682,6 +841,24 @@ export default function GamePage() {
             >
               <RotateCcw className="w-4 h-4 text-sky-600" />
               <span>Xoay bàn cờ</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowHints((prev) => !prev)}
+              aria-label={showHints ? 'Tắt gợi ý nước đi hợp lệ' : 'Bật gợi ý nước đi hợp lệ'}
+              aria-pressed={showHints}
+              title="Bật/tắt chấm gợi ý nước đi"
+              className={`px-3 py-2 border text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all shadow-subtle active:scale-[0.98] ${
+                showHints
+                  ? 'bg-sky-50 border-sky-300 text-sky-800'
+                  : 'bg-white border-slate-200/90 text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <Lightbulb
+                className={`w-4 h-4 ${showHints ? 'text-amber-500 fill-amber-500' : 'text-slate-400'}`}
+              />
+              <span className="hidden sm:inline">Gợi ý {showHints ? 'Bật' : 'Tắt'}</span>
             </button>
 
             <button

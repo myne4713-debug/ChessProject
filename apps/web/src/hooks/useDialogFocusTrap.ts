@@ -14,6 +14,13 @@ export function useDialogFocusTrap<T extends HTMLElement = HTMLDivElement>({
   const containerRef = useRef<T>(null);
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
 
+  // Keep latest callbacks/refs in refs so useEffect doesn't need to re-run on re-renders
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const initialFocusRefRef = useRef(initialFocusRef);
+  initialFocusRefRef.current = initialFocusRef;
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -26,24 +33,29 @@ export function useDialogFocusTrap<T extends HTMLElement = HTMLDivElement>({
     const focusableSelector =
       'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-    // Focus initial element or first focusable
+    // Focus initial element or first focusable (only if focus isn't already inside the container)
     const focusTimer = setTimeout(() => {
-      if (initialFocusRef?.current) {
-        initialFocusRef.current.focus();
+      // If user is already focused or typing inside the container, never steal focus!
+      if (document.activeElement && container.contains(document.activeElement)) {
+        return;
+      }
+
+      if (initialFocusRefRef.current?.current) {
+        initialFocusRefRef.current.current.focus();
       } else {
         const firstFocusable = container.querySelector<HTMLElement>(focusableSelector);
         if (firstFocusable) {
           firstFocusable.focus();
         }
       }
-    }, 50);
+    }, 40);
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (onClose) {
+        if (onCloseRef.current) {
           e.preventDefault();
           e.stopPropagation();
-          onClose();
+          onCloseRef.current();
         }
         return;
       }
@@ -87,7 +99,7 @@ export function useDialogFocusTrap<T extends HTMLElement = HTMLDivElement>({
         previousActiveElementRef.current.focus();
       }
     };
-  }, [isOpen, onClose, initialFocusRef]);
+  }, [isOpen]);
 
   return containerRef;
 }

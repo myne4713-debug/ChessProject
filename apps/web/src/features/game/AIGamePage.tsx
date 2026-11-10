@@ -7,6 +7,7 @@ import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import { soundManager } from '../../lib/sound';
 import { useDialogFocusTrap } from '../../hooks/useDialogFocusTrap';
+import { findKingSquare } from '../../lib/chessUtils';
 import {
   GameState,
   AIDifficulty,
@@ -124,22 +125,6 @@ export default function AIGamePage() {
     const mins = Math.floor(totalSecs / 60);
     const secs = totalSecs % 60;
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
-
-  // Find King square for check warning highlight
-  const findKingSquare = (chess: Chess, color: 'w' | 'b'): string | null => {
-    const board = chess.board();
-    for (let r = 0; r < 8; r++) {
-      for (let c = 0; c < 8; c++) {
-        const piece = board[r][c];
-        if (piece && piece.type === 'k' && piece.color === color) {
-          const file = String.fromCharCode('a'.charCodeAt(0) + c);
-          const rank = 8 - r;
-          return `${file}${rank}`;
-        }
-      }
-    }
-    return null;
   };
 
   // Calculate captured pieces
@@ -635,6 +620,12 @@ export default function AIGamePage() {
     ((gameState.currentTurn === 'w' && !isAiPlayer(gameState.whitePlayerId)) ||
       (gameState.currentTurn === 'b' && !isAiPlayer(gameState.blackPlayerId)));
 
+  const aiTurnColor = orientation === 'white' ? 'b' : 'w';
+  const humanTurnColor = orientation === 'white' ? 'w' : 'b';
+  const currentTurn = localChessRef.current.turn();
+  const aiInCheck = isCheck && currentTurn === aiTurnColor;
+  const humanInCheck = isCheck && currentTurn === humanTurnColor;
+
   // Evaluation centipawns conversion
   const evalPawns = aiStats ? (aiStats.score / 100).toFixed(1) : '0.0';
 
@@ -726,7 +717,9 @@ export default function AIGamePage() {
           {/* Opponent Card (AI) - Chess.com style */}
           <div
             className={`px-3.5 py-2.5 bg-white rounded-2xl flex items-center justify-between transition-all shadow-sm border ${
-              !isHumanTurn && !gameOverResult && gameState
+              aiInCheck && !gameOverResult
+                ? 'border-rose-400 ring-2 ring-rose-100 bg-rose-50/40'
+                : !isHumanTurn && !gameOverResult && gameState
                 ? 'border-sky-300 ring-2 ring-sky-100'
                 : 'border-slate-200/90'
             }`}
@@ -753,6 +746,12 @@ export default function AIGamePage() {
                   <span className="text-[11px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200/80">
                     {difficulty === 'EASY' ? '1000' : difficulty === 'MEDIUM' ? '1500' : '2000'}
                   </span>
+                  {aiInCheck && !gameOverResult && (
+                    <span className="flex items-center gap-1 text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full animate-pulse">
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      Chiếu tướng!
+                    </span>
+                  )}
                 </div>
                 {/* Captured pieces by AI */}
                 <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1 min-h-[18px]">
@@ -829,7 +828,9 @@ export default function AIGamePage() {
           {/* Player Card (You) - Chess.com style */}
           <div
             className={`px-3.5 py-2.5 bg-white rounded-2xl flex items-center justify-between transition-all shadow-sm border ${
-              isHumanTurn && !gameOverResult && gameState
+              humanInCheck && !gameOverResult
+                ? 'border-rose-400 ring-2 ring-rose-100 bg-rose-50/40'
+                : isHumanTurn && !gameOverResult && gameState
                 ? 'border-sky-300 ring-2 ring-sky-100'
                 : 'border-slate-200/90'
             }`}
@@ -853,6 +854,12 @@ export default function AIGamePage() {
                   <span className="text-[11px] text-slate-600 font-medium">
                     ({orientation === 'white' ? 'Trắng' : 'Đen'})
                   </span>
+                  {humanInCheck && !gameOverResult && (
+                    <span className="flex items-center gap-1 text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full animate-pulse">
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      Bạn đang bị chiếu!
+                    </span>
+                  )}
                 </div>
                 {/* Captured pieces by Human */}
                 <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1 min-h-[18px]">

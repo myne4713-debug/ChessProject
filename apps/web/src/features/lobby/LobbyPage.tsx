@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api';
@@ -33,10 +33,12 @@ export default function LobbyPage() {
   const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
   const [colorPref, setColorPref] = useState<'white' | 'black' | 'random'>('random');
   const [selectedTimeKey, setSelectedTimeKey] = useState<keyof typeof TIME_CONTROLS>('BLITZ_5');
+  const roomNameInputRef = useRef<HTMLInputElement>(null);
 
   const createModalRef = useDialogFocusTrap<HTMLDivElement>({
     isOpen: showCreateModal,
     onClose: () => setShowCreateModal(false),
+    initialFocusRef: roomNameInputRef,
   });
 
   // Join code state
@@ -470,6 +472,7 @@ export default function LobbyPage() {
                   Tên phòng
                 </label>
                 <input
+                  ref={roomNameInputRef}
                   type="text"
                   value={roomName}
                   onChange={(e) => setRoomName(e.target.value)}

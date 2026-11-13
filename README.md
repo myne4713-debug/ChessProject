@@ -1,9 +1,10 @@
 # Online Chess Platform ♟️
 
 > **Academic Capstone Project in Software Engineering & Computer Science**  
-> *Real-Time Client-Server Architecture, Authoritative Chess Rules, Google OAuth 2.0, and Custom Minimax AI Engine with Alpha-Beta Pruning.*
+> *Real-Time Client-Server Architecture, Authoritative Chess Rules, Google OAuth 2.0, Multi-threaded Minimax AI Engine with Alpha-Beta Pruning, and WCAG 2.2 AA Accessibility Compliance.*
 
-[![Build & Tests](https://img.shields.io/badge/tests-72%2F72%20passing-brightgreen)](#7-automated-testing-status)
+[![Build & Tests](https://img.shields.io/badge/tests-75%2F75%20passing-brightgreen)](#8-automated-testing-status)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.3-61dafb)](https://react.dev/)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x%20%7C%2022.x-green)](https://nodejs.org/)
@@ -15,55 +16,146 @@
 
 ## 1. Project Overview
 
-**Online Chess** is a production-ready, full-stack, real-time multiplayer chess web application featuring:
-- **Server-Authoritative Game Logic**: Moves, clocks, validation, and game terminations (checkmate, stalemate, draw by repetition, 50-move rule, resignation) are authoritatively computed on the server.
-- **Precision Clock Synchronization**: High-frequency server ticks paired with smooth client-side interpolation, eliminating timer jitter and desynchronization.
-- **Custom Chess AI Search Engine**: Built entirely from scratch using Minimax search, Alpha-Beta pruning, dynamic move ordering (MVV-LVA), and centipawn piece-square tables (no third-party engine dependency).
-- **Comprehensive Authentication**: Standard JWT-based local authentication, email verification flows, and **Google OAuth 2.0 Single Sign-On (SSO)**.
-- **Social & Competitive System**: Matchmaking lobby, private room codes, FIDE-standard Elo ratings, global leaderboard, in-game chat, and move replay.
-- **Administrative Portal**: Real-time system telemetry (CPU, memory, uptime, active connections), user management, and account suspension tools.
+**Online Chess** is a production-grade, full-stack, real-time multiplayer chess web application designed and engineered with modern enterprise architectural patterns:
 
-The user interface follows a modern dark tournament aesthetic localized in **Vietnamese**, while codebase identifiers, API contracts, and academic documentation are maintained in **English**.
+- **Server-Authoritative Game Logic**: All chess moves, validation, clocks, and game terminations (checkmate, stalemate, draw by 50-move rule, threefold repetition, resignation, and timeout) are authoritatively computed on the server.
+- **Optimistic Concurrency & Version Guard (CAS)**: Every state transition is version-tracked with `expectedVersion`, strictly preventing race conditions, desynchronized replay, or concurrent double-move exploits.
+- **Dedicated Worker Thread AI Engine (`AIWorkerPool`)**: High-depth Minimax computations are isolated into a Node.js `worker_threads` pool, guaranteeing zero event-loop blocking under high load.
+- **Iterative Deepening Search (IDS) with PV & MVV-LVA Move Ordering**: Custom algorithmic chess engine featuring dynamic branch pruning, Quiescence evaluation for tactical captures, bitwise time guards (128-node cadence), and resilient in-process fallbacks.
+- **Authoritative Distributed Clocks (`GameClockManager`)**: High-frequency 1-second server heartbeat loops coupled with smooth client-side linear interpolation, eliminating timer drift and latency desynchronization.
+- **Dual-Mode Repository Resilience**: Fault-tolerant data access layer seamlessly alternating between PostgreSQL (Prisma ORM) and transactional in-memory fallback buffers during network partitioning.
+- **Comprehensive Authentication & Security**: Salted Bcrypt hashing, dual-token JWT rotation (Access + Refresh), strict email OTP verification, and **Google OAuth 2.0 Single Sign-On (SSO)**.
+- **Competitive & Social System**: Real-time matchmaking queue, private 6-character room codes, FIDE-standard Elo calculations, global leaderboards, in-game chat, and move replay viewer.
+- **Accessible & Tournament-Grade UI (WCAG 2.2 AA)**: Distinctive dark tournament aesthetic adhering to `frontend-design` standards, high-contrast board themes, focus traps (`useDialogFocusTrap`), check indicators with red danger pulse, tabular numerics (`tabular-nums font-mono`), and zero-latency Web Audio API sound synthesis.
+- **Administrative Portal & Telemetry**: Live system monitoring (CPU, memory, uptime, active rooms), user directory, and account status moderation (`ACTIVE` / `SUSPENDED`).
 
 ---
 
 ## 2. Technology Stack
 
 ### Frontend (`apps/web`)
-- **React 18** with **TypeScript** and **Vite** (hot module replacement and fast builds).
-- **Tailwind CSS** with a custom tournament color palette (`slate-900`, `board-dark`, `board-light`, `clock-amber`).
-- **Zustand** for lightweight authentication and UI state management.
-- **Socket.IO Client** for low-latency bidirectional game networking.
-- **TanStack Query (React Query)** for server-state caching and synchronization.
-- **react-chessboard** with custom piece rendering and viewport touch locks (`touch-none`).
+- **React 18** with **TypeScript** and **Vite** (HMR and optimized code splitting into vendor chunks).
+- **Tailwind CSS** with a tournament palette (`slate-900`, `board-dark`, `board-light`, `clock-amber`).
+- **Zustand** for lightweight reactive authentication and UI state management.
+- **Socket.IO Client** for bidirectional, low-latency WebSocket communication.
+- **TanStack Query (React Query)** for server-state caching, invalidation, and synchronization.
+- **react-chessboard** with customized SVG piece rendering, legal move indicator dots, and mobile touch locks (`touch-none`).
 - **@react-oauth/google** for Google Identity Services integration.
 - **React Hook Form & Zod** for schema validation.
-- **Lucide React** for consistent iconography.
-- **Nginx (Alpine)** as the production reverse proxy container handling SPA routing, WebSocket upgrades, and API proxying.
+- **Web Audio API** for custom procedural audio synthesis (0ms latency, zero external asset overhead).
+- **Lucide React** for accessible, semantic iconography.
+- **Nginx (Alpine)** as production reverse proxy handling SPA routing, WebSocket upgrades, and API proxying.
 
 ### Backend (`apps/server`)
 - **Node.js (v20+ / v22+)** with **TypeScript** and **Express.js**.
 - **Socket.IO** with custom room gateways, heartbeat mechanisms, and authoritative clock intervals.
-- **PostgreSQL 16** for relational persistence.
-- **Prisma ORM** for schema migrations, relational integrity, and connection pooling.
-- **Google Auth Library** for server-side ID token verification.
-- **Nodemailer** for email delivery (verification tokens and account notifications).
-- **bcryptjs & jsonwebtoken** for salted password hashing and JWT access/refresh token management.
-- **Pino & pino-pretty** for structured JSON logging.
+- **Worker Threads (`worker_threads`)**: Dedicated thread pool executing AI search tasks in background threads.
+- **PostgreSQL 16** for ACID-compliant relational persistence.
+- **Prisma ORM** for type-safe schema migrations, relational integrity, and connection pooling.
+- **Google Auth Library** for cryptographic verification of Google ID tokens.
+- **Nodemailer** for transactional emails (verification tokens and account security notices).
+- **bcryptjs & jsonwebtoken** for salted password hashing and JWT access/refresh token lifecycle.
+- **Pino & pino-pretty** for high-performance structured JSON logging.
 - **Vitest & Supertest** for automated unit, integration, and E2E test suites.
 
 ### Custom Chess AI Engine (`apps/server/src/modules/ai`)
 - **Minimax Search** with **Alpha-Beta Pruning**.
-- **Dynamic Move Ordering**: MVV-LVA (Most Valuable Victim - Least Valuable Attacker), promotion priority, and check extensions.
-- **Centipawn Evaluation**: Material balance, Piece-Square Tables (PST) for opening/endgame, king safety metrics, and pawn structure penalties.
+- **Iterative Deepening Search (IDS)**: Depth-by-depth exploration with Principal Variation (PV) move prioritization.
+- **Dynamic Move Ordering**: MVV-LVA (Most Valuable Victim - Least Valuable Attacker), promotion checks, and tactical check extensions.
+- **Quiescence Search**: Solves the horizon effect by evaluating tactical exchanges until a quiet position is reached.
+- **Centipawn Evaluation**: Material balance, Piece-Square Tables (PST), king safety metrics, and pawn structure evaluation.
 - **Configurable Difficulties**:
   - `EASY`: Depth 1 with 35% controlled stochastic variance.
-  - `MEDIUM`: Depth 3 with move ordering.
-  - `HARD`: Depth 4 with tactical depth extension and full position evaluation.
+  - `MEDIUM`: Depth 3 with full move ordering and mate-in-1 detection.
+  - `HARD`: Depth 4 with tactical depth extension and full positional evaluation.
 
 ---
 
-## 3. Monorepo Structure
+## 3. System Architecture & Concurrency Model
+
+```mermaid
+flowchart TD
+    subgraph Client["Client Tier (apps/web)"]
+        UI["React 18 + Tailwind UI"]
+        State["Zustand + React Query"]
+        SocketC["Socket.IO Client"]
+        Audio["Web Audio API Synthesizer"]
+        UI <--> State
+        State <--> SocketC
+        UI --> Audio
+    end
+
+    subgraph Gateway["Reverse Proxy & Gateway"]
+        Nginx["Nginx Reverse Proxy (:80)"]
+    end
+
+    subgraph Server["Backend Tier (apps/server)"]
+        Express["Express.js REST API (:4000)"]
+        SocketS["Socket.IO Server Gateway"]
+        Clock["GameClockManager (1s Heartbeat)"]
+        AuthModule["Auth & Google OAuth 2.0"]
+        GameModule["Game Service & Rule Engine"]
+        Pool["AIWorkerPool (Worker Threads)"]
+        
+        Express <--> AuthModule
+        Express <--> GameModule
+        SocketS <--> GameModule
+        SocketS <--> Clock
+        GameModule <--> Pool
+    end
+
+    subgraph Data["Persistence Tier"]
+        Prisma["Prisma ORM"]
+        Postgres[("PostgreSQL 16 Database")]
+        MemStore["In-Memory Resilient Fallback"]
+        
+        AuthModule --> Prisma
+        GameModule --> Prisma
+        GameModule -.-> MemStore
+        Prisma --> Postgres
+    end
+
+    Client <-->|HTTP /api/v1| Nginx
+    Client <-->|WSS /socket.io| Nginx
+    Nginx <--> Express
+    Nginx <--> SocketS
+```
+
+### Authoritative Move Execution Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Player as Player (White)
+    participant Web as Web Client
+    participant Server as Game Server (Socket.IO)
+    participant Rules as ChessRulesService
+    participant Clock as GameClockManager
+    participant DB as Prisma (PostgreSQL)
+    actor Opponent as Opponent (Black)
+
+    Player->>Web: Makes move on board (e.g. e2 -> e4)
+    Web->>Server: emit("make_move", { gameId, from, to, expectedVersion: 0 })
+    Server->>Rules: validateMove(fen, from, to)
+    
+    alt Move is Illegal or Version Mismatch
+        Rules-->>Server: Invalid move / Stale version error
+        Server-->>Web: emit("error", { message: "Nước đi không hợp lệ" })
+        Web->>Web: Rollback board position
+    else Move is Legal & Valid
+        Rules-->>Server: Valid move (New FEN, SAN, captured piece)
+        Server->>Clock: switchTurn(gameId, "b")
+        Server->>DB: Update game state, FEN, moves, version = 1
+        Server-->>Web: emit("move_made", { move, newFen, clocks, version: 1 })
+        Server-->>Opponent: emit("move_made", { move, newFen, clocks, version: 1 })
+        Web->>Web: Play Web Audio move sound
+        Opponent->>Opponent: Play Web Audio move sound & update board
+    end
+```
+
+---
+
+## 4. Monorepo Structure
 
 ```
 online-chess/
@@ -74,8 +166,11 @@ online-chess/
 │   │   ├── src/
 │   │   │   ├── app/             # App shell, Navbar, Routes
 │   │   │   ├── features/        # Feature modules: auth, lobby, game, ai, leaderboard, profile, replay, admin
+│   │   │   ├── hooks/           # useDialogFocusTrap, useSoundEffect, useWindowSize
+│   │   │   ├── lib/             # chessUtils, confetti, api client
 │   │   │   ├── services/        # Axios API client & Socket.IO singleton
 │   │   │   └── stores/          # Zustand authentication store
+│   │   ├── tests/               # Web client tests (authStore, chessState, chessUtils)
 │   │   └── package.json
 │   └── server/                  # Node.js + Express + Socket.IO backend
 │       ├── Dockerfile           # Multi-stage production Node.js container
@@ -86,7 +181,7 @@ online-chess/
 │       │   ├── middleware/      # JWT auth, role guard, error handler, Zod validator
 │       │   ├── modules/         # auth, users, rooms, matchmaking, games, chess, ai, ratings, admin, mail
 │       │   └── sockets/         # Socket.IO game gateway, room manager & clock loops
-│       ├── tests/               # Vitest test suites (65 passing tests)
+│       ├── tests/               # Server Vitest test suites (65 passing tests)
 │       └── package.json
 ├── packages/
 │   └── shared/                  # Shared TypeScript types, Zod schemas, constants, socket contracts
@@ -106,15 +201,17 @@ online-chess/
 │   ├── deployment.md            # AWS EC2, Let's Encrypt SSL, Docker & Nginx deployment guide
 │   ├── project-analysis.md      # Comprehensive architecture & security analysis
 │   └── use-cases.md             # Use case diagram & formal specifications
+├── BAO_CAO_VA_PHAN_TICH_DU_AN.md # Comprehensive engineering report & technical analysis
 ├── docker-compose.yml           # PostgreSQL 16 + Server + Web Docker setup
 ├── .env.example                 # Template for environment configuration
 ├── package.json                 # Monorepo npm workspaces configuration
-└── README.md
+├── LICENSE                      # MIT Open-Source License
+└── README.md                    # Project documentation
 ```
 
 ---
 
-## 4. Quick Start Guide
+## 5. Quick Start Guide
 
 ### Prerequisites
 - **Node.js** $\ge$ 20.x (LTS recommended)
@@ -144,7 +241,7 @@ npm run db:generate
 # Apply database migrations
 npm run db:migrate
 
-# (Optional) Seed initial data (includes admin account)
+# (Optional) Seed initial data (includes admin account: admin / AdminSecurePass123!)
 npm run db:seed
 ```
 
@@ -154,7 +251,7 @@ npm run build
 ```
 
 ### 5. Run Automated Tests
-Execute the entire test suite across all packages (72 tests):
+Execute the entire test suite across all packages (75 tests):
 ```bash
 npm test
 ```
@@ -171,7 +268,7 @@ Open **`http://localhost:5173`** in your browser.
 
 ---
 
-## 5. Docker Production Deployment
+## 6. Docker Production Deployment
 
 Deploy the entire fullstack platform (Database + Backend + Web Reverse Proxy) with a single command:
 
@@ -195,7 +292,7 @@ For advanced production deployment with **AWS EC2**, **DuckDNS**, **Let's Encryp
 
 ---
 
-## 6. Live Demonstration Walkthrough
+## 7. Live Demonstration Walkthrough
 
 ### Scenario A: Real-Time Human-vs-Human Multiplayer
 1. Open two separate browser tabs or private windows:
@@ -213,11 +310,12 @@ For advanced production deployment with **AWS EC2**, **DuckDNS**, **Let's Encryp
    - Celebration animations fire.
    - Elo rating adjustments are calculated using FIDE Elo formulas and saved to the database.
 
-### Scenario B: Challenging the Custom Chess AI
+### Scenario B: Challenging the Custom Multi-threaded AI
 1. Navigate to **Đấu với AI** (`/ai`).
 2. Select difficulty level (`Dễ`, `Trung bình`, `Khó`) and side (`Trắng` / `Đen`).
 3. Click **Bắt Đầu Ván Mới**.
 4. Play against the AI:
+   - Heavy calculations run inside dedicated `worker_threads` without freezing the server.
    - Real-time diagnostics display search depth, visited nodes, pruned branches, execution time (ms), and centipawn position evaluation.
 
 ### Scenario C: Match Replay & History
@@ -232,30 +330,31 @@ For advanced production deployment with **AWS EC2**, **DuckDNS**, **Let's Encryp
 
 ---
 
-## 7. Automated Testing Status
+## 8. Automated Testing Status
 
-The project includes an end-to-end automated testing pipeline powered by **Vitest** and **Supertest** with **100% passing results (72/72 tests)**:
+The project maintains an automated test pyramid implemented with **Vitest** and **Supertest** with **100% passing results (75/75 tests)** across 10 test suites:
 
-### Backend Test Suites (`apps/server`) — 65 Tests:
-- **`tests/auth.test.ts`** (20 tests): User registration, password hashing, JWT validation, Google OAuth verification, email confirmation, profile updates.
-- **`tests/game.test.ts`** (15 tests): Room creation, matchmaking, authoritative move execution, resignations, draw offers, FIDE Elo calculations.
-- **`tests/chessRules.test.ts`** (8 tests): Turn enforcement, check/checkmate detection, castling legality, en passant, promotion validation.
-- **`tests/phase2.test.ts`** (8 tests): Advanced authorization rules, rate limiting, token refresh cycles, account status enforcement.
-- **`tests/ai.test.ts`** (6 tests): Minimax search depth, alpha-beta cutoffs, MVV-LVA move ordering, tactical evaluation benchmarks.
-- **`tests/health.test.ts`** (4 tests): Healthcheck endpoints, database ping, system uptime, route fallback.
-- **`tests/admin.test.ts`** (4 tests): Administrative access controls, telemetry aggregation, account moderation.
+| Subsystem | Test Suite | Passing Tests | Scope & Key Behaviors Validated |
+| :--- | :--- | :---: | :--- |
+| **Backend** | `tests/auth.test.ts` | 20 | User registration, password hashing, JWT validation, Google OAuth verification, email confirmation, profile updates. |
+| **Backend** | `tests/game.test.ts` | 15 | Room creation, matchmaking, authoritative move execution, resignations, draw offers, FIDE Elo calculations. |
+| **Backend** | `tests/chessRules.test.ts` | 8 | Turn enforcement, check/checkmate detection, castling legality, en passant, promotion validation. |
+| **Backend** | `tests/phase2.test.ts` | 8 | Advanced authorization rules, rate limiting, token refresh cycles, account status enforcement. |
+| **Backend** | `tests/ai.test.ts` | 6 | Minimax search depth, alpha-beta cutoffs, MVV-LVA move ordering, tactical evaluation benchmarks. |
+| **Backend** | `tests/health.test.ts` | 4 | Healthcheck endpoints, database ping, system uptime, route fallback. |
+| **Backend** | `tests/admin.test.ts` | 4 | Administrative access controls, telemetry aggregation, account moderation. |
+| **Frontend** | `tests/authStore.test.ts` | 4 | Zustand authentication state, token storage, login/logout synchronization. |
+| **Frontend** | `tests/chessState.test.ts` | 3 | Client-side board state sync, move parsing, legal drag-and-drop validation. |
+| **Frontend** | `tests/chessUtils.test.ts` | 3 | King in check square locator (`findKingSquare`), check indicators, move highlight helpers. |
 
-### Frontend Test Suites (`apps/web`) — 7 Tests:
-- **`tests/authStore.test.ts`** (4 tests): Zustand authentication state, token storage, login/logout synchronization.
-- **`tests/chessState.test.ts`** (3 tests): Client-side board state sync, move parsing, legal drag-and-drop validation.
-
-**Total**: `72 passed (72)` across 9 test suites in ~14 seconds.
+**Total**: `75 passed (75)` across 10 test files.
 
 ---
 
-## 8. Academic Capstone Documentation Index
+## 9. Academic Documentation Index
 
-Comprehensive documentation is provided in the `docs/` directory:
+Comprehensive documentation is provided in the repository:
+- [Báo cáo và Phân tích Toàn diện Dự án (Comprehensive Report)](BAO_CAO_VA_PHAN_TICH_DU_AN.md)
 - [Requirements Specification (SRS)](docs/requirements.md)
 - [System Architecture & Diagrams](docs/architecture.md)
 - [Database Design & ERD](docs/database-design.md)
@@ -269,8 +368,10 @@ Comprehensive documentation is provided in the `docs/` directory:
 
 ---
 
-## 9. License & Academic Attribution
+## 10. License & Attribution
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
 Developed as an academic capstone project demonstrating Software Engineering, Distributed Systems, Real-Time Networking, and Artificial Intelligence concepts.
 
-All rights reserved © 2026.
+All rights reserved © 2026 Online Chess Contributors.

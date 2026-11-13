@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Online Chess Platform with Real-time Multiplayer and Custom Minimax AI",
+  "license": "MIT",
   "workspaces": [
     "packages/*",
     "apps/*"

@@ -8,7 +8,7 @@ export default function LeaderboardPage() {
   const [page, setPage] = useState(1);
   const limit = 20;
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['leaderboard', page],
     queryFn: async () => {
       const res = await api.get(`/leaderboard?page=${page}&limit=${limit}`);
@@ -52,27 +52,27 @@ export default function LeaderboardPage() {
   const getTitleBadge = (elo: number) => {
     if (elo >= 2200) {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200">
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-purple-50 text-purple-700 border border-purple-200">
           Đại Kiện Tướng
         </span>
       );
     }
     if (elo >= 1800) {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
           Kiện Tướng
         </span>
       );
     }
     if (elo >= 1500) {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
           Cao Thủ
         </span>
       );
     }
     return (
-      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
         Kỳ Thủ
       </span>
     );
@@ -81,14 +81,12 @@ export default function LeaderboardPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 flex-1 flex flex-col gap-6">
       {/* Leaderboard Header */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-8 text-center shadow-card relative overflow-hidden">
-        <div className="w-14 h-14 bg-amber-50 border border-amber-200 rounded-2xl mx-auto flex items-center justify-center mb-3.5 text-amber-600 shadow-sm">
-          <Trophy className="w-7 h-7" />
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-          Bảng Xếp Hạng Kỳ Thủ
+      <div className="pb-5 border-b border-slate-200/80">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+          <Trophy className="w-7 h-7 text-amber-600 shrink-0" aria-hidden="true" />
+          <span>Bảng Xếp Hạng Kỳ Thủ</span>
         </h1>
-        <p className="text-xs sm:text-sm text-slate-500 mt-1.5 max-w-lg mx-auto leading-relaxed">
+        <p className="text-xs sm:text-sm text-slate-500 mt-1.5 max-w-2xl leading-relaxed">
           Điểm hệ số ELO được tính toán và đồng bộ tự động sau mỗi ván đấu theo tiêu chuẩn quốc tế FIDE.
         </p>
       </div>
@@ -97,7 +95,7 @@ export default function LeaderboardPage() {
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-card overflow-hidden flex-1 flex flex-col">
         <div className="overflow-x-auto flex-1">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-50/80 text-slate-600 uppercase font-bold text-[11px] tracking-wider border-b border-slate-200/80">
+            <thead className="bg-slate-50/80 text-slate-600 font-semibold text-xs border-b border-slate-200/80">
               <tr>
                 <th className="px-6 py-3.5 w-24">Thứ Hạng</th>
                 <th className="px-6 py-3.5">Kỳ Thủ</th>
@@ -108,16 +106,33 @@ export default function LeaderboardPage() {
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={4} className="text-center py-16 text-slate-400">
+                  <td colSpan={4} className="text-center py-16 text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <div className="w-6 h-6 border-2 border-sky-600 border-t-transparent rounded-full animate-spin" />
+                      <div className="w-6 h-6 border-2 border-sky-700 border-t-transparent rounded-full animate-spin" />
                       <span className="text-xs">Đang tải dữ liệu xếp hạng...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : isError ? (
+                <tr>
+                  <td colSpan={4} className="text-center py-16 text-slate-600">
+                    <div role="alert" className="flex flex-col items-center justify-center gap-3">
+                      <span className="text-sm font-semibold text-slate-800">
+                        Không thể tải bảng xếp hạng. Vui lòng thử lại.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => refetch()}
+                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                      >
+                        Thử lại
+                      </button>
                     </div>
                   </td>
                 </tr>
               ) : entries.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="text-center py-16 text-slate-400">
+                  <td colSpan={4} className="text-center py-16 text-slate-500">
                     Chưa có kỳ thủ nào trong bảng xếp hạng
                   </td>
                 </tr>
@@ -130,7 +145,7 @@ export default function LeaderboardPage() {
                     <td className="px-6 py-4">{getRankBadge(entry.rank)}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-600 to-blue-700 text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                        <div className="w-8 h-8 rounded-lg bg-slate-900 text-white font-bold text-xs flex items-center justify-center shadow-sm">
                           {entry.username.slice(0, 1).toUpperCase()}
                         </div>
                         <div>
@@ -167,7 +182,7 @@ export default function LeaderboardPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 aria-label="Trang trước"
-                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none text-slate-700 transition-colors"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none text-slate-700 transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -175,7 +190,7 @@ export default function LeaderboardPage() {
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 aria-label="Trang sau"
-                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none text-slate-700 transition-colors"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none text-slate-700 transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>

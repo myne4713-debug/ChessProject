@@ -16,22 +16,54 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('chess.js') || id.includes('react-chessboard')) {
-              return 'vendor-chess';
-            }
-            if (
-              id.includes('react') ||
-              id.includes('react-dom') ||
-              id.includes('react-router-dom') ||
-              id.includes('@tanstack') ||
-              id.includes('zustand')
-            ) {
-              return 'vendor-react';
-            }
-            if (id.includes('lucide-react') || id.includes('canvas-confetti') || id.includes('axios')) {
-              return 'vendor-ui';
-            }
+          const normalized = id.replace(/\\/g, '/');
+          if (!normalized.includes('/node_modules/')) return;
+
+          if (normalized.includes('/node_modules/chess.js/')) {
+            return 'vendor-chess-engine';
+          }
+          if (
+            normalized.includes('/node_modules/react-chessboard/') ||
+            normalized.includes('/node_modules/react-dnd/') ||
+            normalized.includes('/node_modules/react-dnd-html5-backend/') ||
+            normalized.includes('/node_modules/react-dnd-touch-backend/') ||
+            normalized.includes('/node_modules/dnd-core/') ||
+            normalized.includes('/node_modules/@react-dnd/')
+          ) {
+            return 'vendor-chessboard';
+          }
+          if (
+            normalized.includes('/node_modules/react/') ||
+            normalized.includes('/node_modules/react-dom/') ||
+            normalized.includes('/node_modules/scheduler/') ||
+            normalized.includes('/node_modules/react-router/') ||
+            normalized.includes('/node_modules/react-router-dom/') ||
+            normalized.includes('/node_modules/@remix-run/router/') ||
+            normalized.includes('/node_modules/@tanstack/') ||
+            normalized.includes('/node_modules/zustand/')
+          ) {
+            return 'vendor-react';
+          }
+          if (
+            normalized.includes('/node_modules/react-hook-form/') ||
+            normalized.includes('/node_modules/@hookform/') ||
+            normalized.includes('/node_modules/zod/')
+          ) {
+            return 'vendor-forms';
+          }
+          if (
+            normalized.includes('/node_modules/socket.io-client/') ||
+            normalized.includes('/node_modules/engine.io-client/') ||
+            normalized.includes('/node_modules/socket.io-parser/') ||
+            normalized.includes('/node_modules/engine.io-parser/')
+          ) {
+            return 'vendor-socket';
+          }
+          if (normalized.includes('/node_modules/lucide-react/')) {
+            return 'vendor-icons';
+          }
+          if (normalized.includes('/node_modules/axios/')) {
+            return 'vendor-http';
           }
         },
       },

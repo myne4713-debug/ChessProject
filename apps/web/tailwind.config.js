@@ -2,6 +2,7 @@ import tailwindcssAnimate from 'tailwindcss-animate';
 
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: ['class', '[data-theme="dark"]'],
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -10,18 +11,26 @@ export default {
     extend: {
       colors: {
         chess: {
-          bg: '#f8fafc',
-          card: '#ffffff',
-          surface: '#f1f5f9',
-          border: '#e2e8f0',
-          boardLight: '#f0f5fa',
-          boardDark: '#6ba3c8',
-          boardHighlight: '#bae6fd',
-          primary: '#0284c7',
-          primaryHover: '#0369a1',
-          accent: '#38bdf8',
-          accentLight: '#f0f9ff',
-          ice: '#e0f2fe',
+          bg: 'var(--chess-bg)',
+          card: 'var(--chess-card)',
+          surface: 'var(--chess-surface)',
+          border: 'var(--chess-border)',
+          obsidian: 'var(--chess-obsidian)',
+          ink: 'var(--chess-ink)',
+          muted: 'var(--chess-ink-muted)',
+          boardLight: 'var(--chess-board-light)',
+          boardDark: 'var(--chess-board-dark)',
+          boardHighlight: 'var(--chess-board-highlight-light)',
+          boardHighlightDark: 'var(--chess-board-highlight-dark)',
+          primary: 'var(--chess-primary)',
+          primaryHover: 'var(--chess-primary-hover)',
+          focus: 'var(--chess-focus)',
+          accent: 'var(--chess-accent)',
+          accentLight: 'var(--chess-accent-light)',
+          ice: 'var(--chess-ice)',
+          clockAmber: 'var(--chess-clock-amber)',
+          danger: 'var(--chess-danger)',
+          success: 'var(--chess-success)',
         }
       },
       boxShadow: {

@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { UserProfile } from '@online-chess/shared';
-import { disconnectSocket } from '../services/socket';
+
+let socketDisconnectHandler: (() => void) | null = null;
+
+export function registerSocketDisconnectHandler(handler: () => void) {
+  socketDisconnectHandler = handler;
+}
 
 interface AuthState {
   user: UserProfile | null;
@@ -56,7 +61,7 @@ export const useAuthStore = create<AuthState>((set) => {
         localStorage.removeItem(STORAGE_KEY_TOKEN);
         localStorage.removeItem(STORAGE_KEY_USER);
       }
-      disconnectSocket();
+      socketDisconnectHandler?.();
       set({ user: null, token: null, isAuthenticated: false });
     },
   };

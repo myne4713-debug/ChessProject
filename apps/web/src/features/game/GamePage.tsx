@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Chessboard } from 'react-chessboard';
 import { Chess, Square } from 'chess.js';
@@ -18,7 +18,6 @@ import {
   SOCKET_EVENTS,
 } from '@online-chess/shared';
 import {
-  Clock,
   RotateCcw,
   Flag,
   Handshake,
@@ -35,9 +34,17 @@ import {
   Swords,
   Lightbulb,
   ShieldAlert,
+  X,
 } from 'lucide-react';
 import { PieceSvg } from '../../components/chess/PieceSvg';
 import { PromotionModal } from './components/PromotionModal';
+import { PlayerClock } from './components/PlayerClock';
+import {
+  CHESS_BOARD_STYLE,
+  CHESS_DARK_SQUARE_STYLE,
+  CHESS_LIGHT_SQUARE_STYLE,
+  buildSquareHighlightStyles,
+} from '../../lib/boardTheme';
 
 export default function GamePage() {
   const { id: gameId } = useParams<{ id: string }>();
@@ -65,13 +72,40 @@ export default function GamePage() {
   const [inputMessage, setInputMessage] = useState('');
   const [gameOverData, setGameOverData] = useState<GameOverPayload | null>(null);
 
-  // Clocks
-  const [whiteClockMs, setWhiteClockMs] = useState(300000);
-  const [blackClockMs, setBlackClockMs] = useState(300000);
+  // Server-synced clocks (updated only on state fetch, move, or sync tick; countdown lives inside PlayerClock)
+  const [clockSync, setClockSync] = useState<{
+    whiteMs: number;
+    blackMs: number;
+    timestamp: number;
+  }>({
+    whiteMs: 300000,
+    blackMs: 300000,
+    timestamp: Date.now(),
+  });
 
   // Modals & offers
   const [incomingDrawOffer, setIncomingDrawOffer] = useState<string | null>(null);
   const [showResignModal, setShowResignModal] = useState(false);
+  const [drawOfferSent, setDrawOfferSent] = useState(false);
+  const [statusNotice, setStatusNotice] = useState<{
+    type: 'info' | 'error';
+    message: string;
+  } | null>(null);
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showStatusNotice = useCallback((type: 'info' | 'error', message: string) => {
+    setStatusNotice({ type, message });
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = setTimeout(() => {
+      setStatusNotice(null);
+    }, 5000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    };
+  }, []);
   const [lastMoveSquares, setLastMoveSquares] = useState<{ from?: string; to?: string }>({});
   const [pendingPromotion, setPendingPromotion] = useState<{
     from: string;
@@ -105,23 +139,31 @@ export default function GamePage() {
   const localChessRef = useRef(new Chess());
   const gameStateRef = useRef<GameState | null>(null);
   gameStateRef.current = gameState;
+  const isDraggingPieceRef = useRef(false);
 
-  const lastSyncRef = useRef<{
-    whiteMs: number;
-    blackMs: number;
-    turn: 'w' | 'b';
-    timestamp: number;
-  } | null>(null);
+  const clearSelection = useCallback(() => {
+    isDraggingPieceRef.current = false;
+    setSelectedSquare(null);
+    setPossibleMoves([]);
+    setCaptureMoves(new Set());
+  }, []);
 
-  const syncClocks = (whiteMs: number, blackMs: number, turn: 'w' | 'b') => {
-    lastSyncRef.current = {
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      if (isDraggingPieceRef.current) {
+        clearSelection();
+      }
+    };
+    window.addEventListener('blur', handleWindowBlur);
+    return () => window.removeEventListener('blur', handleWindowBlur);
+  }, [clearSelection]);
+
+  const syncClocks = (whiteMs: number, blackMs: number) => {
+    setClockSync({
       whiteMs,
       blackMs,
-      turn,
       timestamp: Date.now(),
-    };
-    setWhiteClockMs(whiteMs);
-    setBlackClockMs(blackMs);
+    });
   };
 
   // Determine user's assigned color
@@ -233,8 +275,7 @@ export default function GamePage() {
         setCaptureMoves(new Set());
         syncClocks(
           res.data.state.whiteRemainingMs,
-          res.data.state.blackRemainingMs,
-          res.data.state.currentTurn
+          res.data.state.blackRemainingMs
         );
         if (res.data.messages) {
           setChatMessages(res.data.messages);
@@ -249,7 +290,8 @@ export default function GamePage() {
       setSelectedSquare(null);
       setPossibleMoves([]);
       setCaptureMoves(new Set());
-      syncClocks(payload.whiteRemainingMs, payload.blackRemainingMs, payload.currentTurn);
+      setDrawOfferSent(false);
+      syncClocks(payload.whiteRemainingMs, payload.blackRemainingMs);
       setLastMoveSquares({ from: payload.move.fromSquare, to: payload.move.toSquare });
 
       if (payload.isGameOver) {
@@ -276,27 +318,14 @@ export default function GamePage() {
     };
 
     const handleClockSync = (payload: ClockUpdatePayload) => {
-      const currentTurn = gameStateRef.current?.currentTurn || 'w';
-      if (lastSyncRef.current) {
-        lastSyncRef.current.whiteMs = payload.whiteRemainingMs;
-        lastSyncRef.current.blackMs = payload.blackRemainingMs;
-        lastSyncRef.current.turn = currentTurn;
-        lastSyncRef.current.timestamp = Date.now();
-      } else {
-        lastSyncRef.current = {
-          whiteMs: payload.whiteRemainingMs,
-          blackMs: payload.blackRemainingMs,
-          turn: currentTurn,
-          timestamp: Date.now(),
-        };
-      }
-      setWhiteClockMs(payload.whiteRemainingMs);
-      setBlackClockMs(payload.blackRemainingMs);
+      syncClocks(payload.whiteRemainingMs, payload.blackRemainingMs);
     };
 
     const handleGameOver = (payload: GameOverPayload) => {
       setGameOverData(payload);
       setIsCheck(false);
+      setDrawOfferSent(false);
+      setStatusNotice(null);
       setSelectedSquare(null);
       setPossibleMoves([]);
       setCaptureMoves(new Set());
@@ -314,12 +343,15 @@ export default function GamePage() {
       setIncomingDrawOffer(data.offeredBy);
     };
 
-    const handleError = () => {
+    const handleError = (err?: { message?: string }) => {
       // Revert optimistic move on socket rejection
       const current = gameStateRef.current;
       if (current) {
         setBoardFen(current.currentFen);
         localChessRef.current = new Chess(current.currentFen);
+      }
+      if (err?.message) {
+        showStatusNotice('error', err.message);
       }
     };
 
@@ -340,32 +372,11 @@ export default function GamePage() {
     };
   }, [gameId, isWaitingRoom, socket, user?.id]);
 
-  // Smooth clock countdown without jitter or double-counting
-  useEffect(() => {
-    if (!gameState || gameState.status !== 'IN_PROGRESS' || gameOverData) return;
-
-    const interval = setInterval(() => {
-      if (!lastSyncRef.current) return;
-      const { whiteMs, blackMs, turn, timestamp } = lastSyncRef.current;
-      const elapsed = Date.now() - timestamp;
-
-      if (turn === 'w') {
-        const remaining = Math.max(0, whiteMs - elapsed);
-        setWhiteClockMs(remaining);
-        if (remaining <= 0 && isPlayer) {
-          socket.emit(SOCKET_EVENTS.CLAIM_TIMEOUT, { gameId });
-        }
-      } else {
-        const remaining = Math.max(0, blackMs - elapsed);
-        setBlackClockMs(remaining);
-        if (remaining <= 0 && isPlayer) {
-          socket.emit(SOCKET_EVENTS.CLAIM_TIMEOUT, { gameId });
-        }
-      }
-    }, 250);
-
-    return () => clearInterval(interval);
-  }, [gameState?.status, gameOverData, isPlayer, gameId, socket]);
+  const handleClaimTimeout = useCallback(() => {
+    if (isPlayer && gameId) {
+      socket.emit(SOCKET_EVENTS.CLAIM_TIMEOUT, { gameId });
+    }
+  }, [isPlayer, gameId, socket]);
 
   // Auto-scroll chat internally to bottom without scrolling window
   useEffect(() => {
@@ -429,9 +440,7 @@ export default function GamePage() {
   };
 
   const onPieceDrop = (sourceSquare: string, targetSquare: string): boolean => {
-    setSelectedSquare(null);
-    setPossibleMoves([]);
-    setCaptureMoves(new Set());
+    clearSelection();
 
     if (!isPlayer || !gameId || gameOverData || !isMyTurn) return false;
 
@@ -513,12 +522,17 @@ export default function GamePage() {
     const pieceObj = localChessRef.current.get(sourceSquare);
 
     if (pieceObj && pieceObj.color === myColor) {
+      isDraggingPieceRef.current = true;
       setSelectedSquare(sourceSquare);
       const moves = localChessRef.current.moves({ square: sourceSquare, verbose: true });
       setPossibleMoves(moves.map((m) => m.to as Square));
       setCaptureMoves(new Set(moves.filter((m) => !!m.captured).map((m) => m.to as Square)));
     }
   };
+
+  const handlePieceDragEnd = useCallback(() => {
+    clearSelection();
+  }, [clearSelection]);
 
   const handlePromotionSelect = (promPiece: 'q' | 'r' | 'b' | 'n') => {
     if (!pendingPromotion) return;
@@ -545,9 +559,10 @@ export default function GamePage() {
   };
 
   const handleOfferDraw = () => {
-    if (!gameId) return;
+    if (!gameId || drawOfferSent) return;
     socket.emit(SOCKET_EVENTS.DRAW_OFFER, { gameId });
-    alert('Đã gửi lời mời cầu hòa tới đối thủ');
+    setDrawOfferSent(true);
+    showStatusNotice('info', 'Đã gửi đề nghị hòa tới đối thủ. Chờ phản hồi.');
   };
 
   const handleAcceptDraw = () => {
@@ -562,72 +577,26 @@ export default function GamePage() {
     setIncomingDrawOffer(null);
   };
 
-  const formatClock = (ms: number) => {
-    const totalSecs = Math.max(0, Math.floor(ms / 1000));
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
-
   const isMyTurn =
     gameState?.status === 'IN_PROGRESS' &&
     ((gameState?.currentTurn === 'w' && isWhitePlayer) ||
       (gameState?.currentTurn === 'b' && isBlackPlayer));
 
-  // Custom square highlighting for moves, selection, hints & king in check
-  const customSquareStyles: Record<string, React.CSSProperties> = {};
+  // Memoize custom square highlighting for moves, selection, hints & king in check
+  const customSquareStyles = useMemo(() => {
+    const kingSq = isCheck
+      ? findKingSquare(localChessRef.current, localChessRef.current.turn())
+      : null;
 
-  // 1. Last move squares highlight (gentle sky blue warmth)
-  if (lastMoveSquares.from) {
-    customSquareStyles[lastMoveSquares.from] = { backgroundColor: 'rgba(56, 189, 248, 0.25)' };
-  }
-  if (lastMoveSquares.to) {
-    customSquareStyles[lastMoveSquares.to] = { backgroundColor: 'rgba(56, 189, 248, 0.38)' };
-  }
-
-  // 2. Selected square highlight
-  if (selectedSquare) {
-    customSquareStyles[selectedSquare] = {
-      backgroundColor: 'rgba(14, 165, 233, 0.32)',
-      boxShadow: 'inset 0 0 0 2px #0284c7',
-    };
-  }
-
-  // 3. Legal move dots & capture rings
-  if (showHints) {
-    possibleMoves.forEach((sq) => {
-      const isCapture = captureMoves.has(sq);
-      if (isCapture) {
-        // Warm red target circle around enemy piece
-        customSquareStyles[sq] = {
-          background:
-            'radial-gradient(circle, transparent 56%, rgba(239, 68, 68, 0.65) 57%, rgba(239, 68, 68, 0.65) 72%, transparent 73%)',
-          cursor: 'pointer',
-          borderRadius: '50%',
-        };
-      } else {
-        // Soft blue circular dot on empty square
-        customSquareStyles[sq] = {
-          background:
-            'radial-gradient(circle, rgba(14, 165, 233, 0.75) 23%, transparent 24%)',
-          cursor: 'pointer',
-          borderRadius: '50%',
-        };
-      }
+    return buildSquareHighlightStyles({
+      lastMoveSquares,
+      selectedSquare,
+      showHints,
+      possibleMoves,
+      captureMoves,
+      kingInCheckSquare: kingSq,
     });
-  }
-
-  // 4. King in check highlight (red radial spotlight)
-  if (isCheck) {
-    const checkedTurn = localChessRef.current.turn();
-    const kingSq = findKingSquare(localChessRef.current, checkedTurn);
-    if (kingSq) {
-      customSquareStyles[kingSq] = {
-        background:
-          'radial-gradient(ellipse at center, rgba(239, 68, 68, 0.9) 0%, rgba(239, 68, 68, 0.45) 50%, transparent 80%)',
-      };
-    }
-  }
+  }, [lastMoveSquares, selectedSquare, showHints, possibleMoves, captureMoves, isCheck, boardFen]);
 
   const isTopPlayerTurn =
     gameState?.currentTurn === (orientation === 'white' ? 'b' : 'w') && !gameOverData;
@@ -637,8 +606,8 @@ export default function GamePage() {
   const isTopInCheck = isCheck && gameState?.currentTurn === (orientation === 'white' ? 'b' : 'w');
   const isBottomInCheck = isCheck && gameState?.currentTurn === (orientation === 'white' ? 'w' : 'b');
 
-  const topClockMs = orientation === 'white' ? blackClockMs : whiteClockMs;
-  const bottomClockMs = orientation === 'white' ? whiteClockMs : blackClockMs;
+  const topClockMs = orientation === 'white' ? clockSync.blackMs : clockSync.whiteMs;
+  const bottomClockMs = orientation === 'white' ? clockSync.whiteMs : clockSync.blackMs;
 
   if (isWaitingRoom) {
     return (
@@ -648,22 +617,22 @@ export default function GamePage() {
           <div className="relative w-20 h-20 mx-auto mb-6 flex items-center justify-center">
             <span className="absolute inset-0 rounded-full bg-sky-400/20 animate-ping" />
             <span className="absolute inset-2 rounded-full bg-sky-200/40 animate-pulse" />
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-600 to-blue-700 text-white flex items-center justify-center shadow-md shadow-sky-500/25 relative z-10">
+            <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 text-white flex items-center justify-center shadow-md relative z-10">
               <Swords className="w-8 h-8" />
             </div>
           </div>
 
-          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-2">
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-2">
             Đang Chờ Đối Thủ Tham Gia
-          </h2>
+          </h1>
           <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mb-8 leading-relaxed">
             Phòng đấu đã được khởi tạo. Hãy gửi mã phòng hoặc link mời trực tiếp cho bạn bè để bắt đầu thi đấu.
           </p>
 
           {/* Room Code Card */}
-          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-6 mb-6 flex flex-col items-center gap-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Mã Phòng Của Bạn
+          <div className="border-y border-slate-200/80 py-6 mb-6 flex flex-col items-center gap-3">
+            <span className="text-xs font-semibold text-slate-600">
+              Mã phòng của bạn
             </span>
             <div className="font-mono text-3xl sm:text-4xl font-black text-sky-700 tracking-widest tabular-nums select-all">
               {roomCodeParam || '...'}
@@ -672,7 +641,7 @@ export default function GamePage() {
               <button
                 type="button"
                 onClick={copyCode}
-                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-subtle transition-all active:scale-[0.98]"
+                className="px-4 py-2 min-h-[44px] bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-subtle transition-colors active:scale-[0.98]"
               >
                 {copiedCode ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-500" />}
                 <span>{copiedCode ? 'Đã sao chép mã!' : 'Sao chép mã'}</span>
@@ -680,7 +649,7 @@ export default function GamePage() {
               <button
                 type="button"
                 onClick={copyInviteLink}
-                className="px-4 py-2 bg-sky-600 hover:bg-sky-700 active:scale-[0.98] text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
+                className="px-4 py-2 min-h-[44px] bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-sm transition-colors"
               >
                 {copiedLink ? <Check className="w-4 h-4 text-white" /> : <Share2 className="w-4 h-4 text-white" />}
                 <span>{copiedLink ? 'Đã sao chép link!' : 'Sao chép link mời'}</span>
@@ -692,7 +661,7 @@ export default function GamePage() {
           <button
             type="button"
             onClick={handleCancelWaitingRoom}
-            className="w-full py-3 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-slate-200 hover:border-rose-200 rounded-xl text-xs sm:text-sm font-semibold transition-all active:scale-[0.98]"
+            className="w-full py-3 bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-slate-200 hover:border-rose-200 rounded-xl text-xs sm:text-sm font-semibold transition-colors active:scale-[0.98]"
           >
             Hủy Phòng & Quay Lại Sảnh Chờ
           </button>
@@ -701,13 +670,33 @@ export default function GamePage() {
     );
   }
 
+  const liveStatusAnnouncement = gameOverData
+    ? `Trận đấu kết thúc: ${
+        gameOverData.result === 'WHITE_WON'
+          ? 'Quân Trắng thắng'
+          : gameOverData.result === 'BLACK_WON'
+          ? 'Quân Đen thắng'
+          : 'Trận đấu hòa'
+      }`
+    : isCheck
+    ? `Chiếu tướng! ${isMyTurn ? 'Đến lượt bạn' : 'Đến lượt đối thủ'}`
+    : isMyTurn
+    ? 'Đến lượt bạn'
+    : gameState?.status === 'IN_PROGRESS'
+    ? 'Đến lượt đối thủ'
+    : '';
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 flex flex-col lg:flex-row gap-6 items-start">
+      <h1 className="sr-only">Phòng thi đấu cờ vua trực tuyến</h1>
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {liveStatusAnnouncement}
+      </div>
       {/* Left: Chessboard & Player Info */}
-      <div className="flex-1 w-full max-w-2xl mx-auto flex flex-col gap-3">
+      <div className="flex-1 min-w-0 w-full max-w-2xl mx-auto flex flex-col gap-3">
         {/* Top Player (Opponent) */}
         <div
-          className={`p-3.5 sm:p-4 rounded-2xl border flex items-center justify-between transition-all duration-150 ${
+          className={`p-3.5 sm:p-4 rounded-2xl border flex items-center justify-between gap-3 transition-[background-color,border-color,box-shadow] duration-150 ${
             isTopInCheck && !gameOverData
               ? 'bg-rose-50/70 border-rose-400 shadow-card ring-1 ring-rose-300'
               : isTopPlayerTurn
@@ -715,19 +704,19 @@ export default function GamePage() {
               : 'bg-white border-slate-200/80 shadow-subtle'
           }`}
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200 shadow-sm">
               <PieceSvg type="k" color={orientation === 'white' ? 'b' : 'w'} className="w-6 h-6" />
             </div>
-            <div>
-              <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <span>
+            <div className="min-w-0 flex-1">
+              <div className="font-bold text-slate-900 text-sm flex flex-wrap items-center gap-2">
+                <span className="truncate">
                   {orientation === 'white'
                     ? gameState?.blackPlayerName || 'Đối thủ'
                     : gameState?.whitePlayerName || 'Đối thủ'}
                 </span>
                 {isTopInCheck && !gameOverData && (
-                  <span className="flex items-center gap-1 text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full animate-pulse">
+                  <span className="flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full animate-pulse">
                     <ShieldAlert className="w-3.5 h-3.5" />
                     Chiếu tướng!
                   </span>
@@ -743,42 +732,40 @@ export default function GamePage() {
           </div>
 
           {/* Clock */}
-          <div
-            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl font-mono tabular-nums text-lg font-bold flex items-center gap-2 tracking-tight transition-colors ${
-              isTopPlayerTurn
-                ? topClockMs < 30000
-                  ? 'bg-rose-600 text-white animate-pulse'
-                  : 'bg-sky-600 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-700 border border-slate-200'
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            <span>{formatClock(topClockMs)}</span>
-          </div>
+          <PlayerClock
+            syncedMs={topClockMs}
+            syncTimestamp={clockSync.timestamp}
+            isRunning={!!isTopPlayerTurn && gameState?.status === 'IN_PROGRESS' && !gameOverData}
+            isActive={!!isTopPlayerTurn}
+            onTimeout={isPlayer ? handleClaimTimeout : undefined}
+          />
         </div>
 
         {/* The Interactive Chessboard */}
-        <div className="w-full aspect-square bg-white p-2.5 sm:p-3 rounded-2xl shadow-card border border-slate-200/90 touch-none select-none">
+        <div
+          onPointerCancel={clearSelection}
+          onTouchCancel={clearSelection}
+          className="w-full aspect-square bg-white p-2.5 sm:p-3 rounded-2xl shadow-card border border-slate-200/90 board-touch-surface touch-none select-none"
+        >
           <Chessboard
             position={boardFen}
             onPieceDrop={onPieceDrop}
             onSquareClick={handleSquareClick}
             onPieceDragBegin={handlePieceDragBegin}
+            onPieceDragEnd={handlePieceDragEnd}
+            onPieceDropOffBoard={clearSelection}
             boardOrientation={orientation}
             arePiecesDraggable={isPlayer && !gameOverData && isMyTurn}
-            customBoardStyle={{
-              borderRadius: '12px',
-              boxShadow: '0 2px 10px -2px rgba(15, 23, 42, 0.05)',
-            }}
-            customDarkSquareStyle={{ backgroundColor: '#6ba3c8' }}
-            customLightSquareStyle={{ backgroundColor: '#f0f5fa' }}
+            customBoardStyle={CHESS_BOARD_STYLE}
+            customDarkSquareStyle={CHESS_DARK_SQUARE_STYLE}
+            customLightSquareStyle={CHESS_LIGHT_SQUARE_STYLE}
             customSquareStyles={customSquareStyles}
           />
         </div>
 
         {/* Bottom Player (You) */}
         <div
-          className={`p-3.5 sm:p-4 rounded-2xl border flex items-center justify-between transition-all duration-150 ${
+          className={`p-3.5 sm:p-4 rounded-2xl border flex items-center justify-between gap-3 transition-[background-color,border-color,box-shadow] duration-150 ${
             isBottomInCheck && !gameOverData
               ? 'bg-rose-50/70 border-rose-400 shadow-card ring-1 ring-rose-300'
               : isBottomPlayerTurn
@@ -786,22 +773,22 @@ export default function GamePage() {
               : 'bg-white border-slate-200/80 shadow-subtle'
           }`}
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200 shadow-sm">
               <PieceSvg type="k" color={orientation === 'white' ? 'w' : 'b'} className="w-6 h-6" />
             </div>
-            <div>
-              <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <span>
+            <div className="min-w-0 flex-1">
+              <div className="font-bold text-slate-900 text-sm flex flex-wrap items-center gap-2">
+                <span className="truncate">
                   {orientation === 'white'
                     ? gameState?.whitePlayerName || user?.username || 'Bạn'
                     : gameState?.blackPlayerName || user?.username || 'Bạn'}
                 </span>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200/70 font-semibold">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200/70 font-semibold">
                   Bạn
                 </span>
                 {isBottomInCheck && !gameOverData && (
-                  <span className="flex items-center gap-1 text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full animate-pulse">
+                  <span className="flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full animate-pulse">
                     <ShieldAlert className="w-3.5 h-3.5" />
                     Bạn đang bị chiếu!
                   </span>
@@ -817,30 +804,26 @@ export default function GamePage() {
           </div>
 
           {/* Clock */}
-          <div
-            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl font-mono tabular-nums text-lg font-bold flex items-center gap-2 tracking-tight transition-colors ${
-              isBottomPlayerTurn
-                ? bottomClockMs < 30000
-                  ? 'bg-rose-600 text-white animate-pulse'
-                  : 'bg-sky-600 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-700 border border-slate-200'
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            <span>{formatClock(bottomClockMs)}</span>
-          </div>
+          <PlayerClock
+            syncedMs={bottomClockMs}
+            syncTimestamp={clockSync.timestamp}
+            isRunning={!!isBottomPlayerTurn && gameState?.status === 'IN_PROGRESS' && !gameOverData}
+            isActive={!!isBottomPlayerTurn}
+            onTimeout={isPlayer ? handleClaimTimeout : undefined}
+          />
         </div>
 
         {/* Controls Toolbar */}
-        <div className="flex items-center justify-between gap-3 pt-1">
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={() => setOrientation((prev) => (prev === 'white' ? 'black' : 'white'))}
               aria-label="Xoay hướng bàn cờ"
-              className="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-2 transition-all shadow-subtle active:scale-[0.98]"
+              className="px-3 sm:px-3.5 py-2 min-h-[44px] min-w-[44px] bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-subtle active:scale-[0.98]"
             >
               <RotateCcw className="w-4 h-4 text-sky-600" />
-              <span>Xoay bàn cờ</span>
+              <span className="hidden sm:inline">Xoay bàn cờ</span>
             </button>
 
             <button
@@ -849,23 +832,24 @@ export default function GamePage() {
               aria-label={showHints ? 'Tắt gợi ý nước đi hợp lệ' : 'Bật gợi ý nước đi hợp lệ'}
               aria-pressed={showHints}
               title="Bật/tắt chấm gợi ý nước đi"
-              className={`px-3 py-2 border text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all shadow-subtle active:scale-[0.98] ${
+              className={`px-3 py-2 min-h-[44px] min-w-[44px] border text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-subtle active:scale-[0.98] ${
                 showHints
                   ? 'bg-sky-50 border-sky-300 text-sky-800'
                   : 'bg-white border-slate-200/90 text-slate-500 hover:bg-slate-50'
               }`}
             >
               <Lightbulb
-                className={`w-4 h-4 ${showHints ? 'text-amber-500 fill-amber-500' : 'text-slate-400'}`}
+                className={`w-4 h-4 ${showHints ? 'text-amber-500 fill-amber-500' : 'text-slate-500'}`}
               />
               <span className="hidden sm:inline">Gợi ý {showHints ? 'Bật' : 'Tắt'}</span>
             </button>
 
             <button
+              type="button"
               onClick={toggleSound}
               aria-label={soundEnabled ? 'Tắt âm thanh ván đấu' : 'Bật âm thanh ván đấu'}
               title="Âm thanh"
-              className={`px-3 py-2 border text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all shadow-subtle active:scale-[0.98] ${
+              className={`px-3 py-2 min-h-[44px] min-w-[44px] border text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-subtle active:scale-[0.98] ${
                 soundEnabled
                   ? 'bg-sky-50 border-sky-300 text-sky-800'
                   : 'bg-white border-slate-200/90 text-slate-500 hover:bg-slate-50'
@@ -874,7 +858,7 @@ export default function GamePage() {
               {soundEnabled ? (
                 <Volume2 className="w-4 h-4 text-sky-600" />
               ) : (
-                <VolumeX className="w-4 h-4 text-slate-400" />
+                <VolumeX className="w-4 h-4 text-slate-500" />
               )}
               <span className="hidden sm:inline">Âm thanh</span>
             </button>
@@ -883,15 +867,18 @@ export default function GamePage() {
           {isPlayer && !gameOverData && (
             <div className="flex items-center gap-2">
               <button
+                type="button"
+                disabled={drawOfferSent}
                 onClick={handleOfferDraw}
-                className="px-3.5 py-2 bg-white hover:bg-amber-50 border border-slate-200/90 hover:border-amber-300 text-slate-700 hover:text-amber-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all shadow-subtle active:scale-[0.98]"
+                className="px-3.5 py-2 min-h-[44px] min-w-[44px] bg-white hover:bg-amber-50 border border-slate-200/90 hover:border-amber-300 text-slate-700 hover:text-amber-700 disabled:opacity-60 disabled:pointer-events-none text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-subtle active:scale-[0.98]"
               >
                 <Handshake className="w-4 h-4 text-amber-500" />
-                <span>Cầu hòa</span>
+                <span>{drawOfferSent ? 'Đã gửi hòa' : 'Cầu hòa'}</span>
               </button>
               <button
+                type="button"
                 onClick={() => setShowResignModal(true)}
-                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all shadow-subtle active:scale-[0.98]"
+                className="px-3.5 py-2 min-h-[44px] min-w-[44px] bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-subtle active:scale-[0.98]"
               >
                 <Flag className="w-4 h-4 text-rose-500" />
                 <span>Đầu hàng</span>
@@ -899,18 +886,47 @@ export default function GamePage() {
             </div>
           )}
         </div>
+
+        {statusNotice && (
+          <div
+            role={statusNotice.type === 'error' ? 'alert' : 'status'}
+            aria-live="polite"
+            className={`px-3.5 py-2.5 rounded-xl border text-xs font-medium flex items-center justify-between gap-3 animate-in fade-in duration-150 ${
+              statusNotice.type === 'error'
+                ? 'bg-rose-50 border-rose-200 text-rose-700'
+                : 'bg-sky-50 border-sky-200 text-sky-800'
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              {statusNotice.type === 'error' ? (
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" aria-hidden="true" />
+              ) : (
+                <Handshake className="w-4 h-4 shrink-0 text-sky-700" aria-hidden="true" />
+              )}
+              <span>{statusNotice.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setStatusNotice(null)}
+              aria-label="Đóng thông báo"
+              className="min-h-[44px] min-w-[44px] sm:min-h-[32px] sm:min-w-[32px] shrink-0 flex items-center justify-center rounded-lg hover:bg-black/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Right: Move History & In-Game Chat Panel */}
-      <div className="w-full lg:w-96 flex flex-col gap-4 self-stretch">
+      <div className="w-full lg:w-96 min-w-0 flex flex-col gap-4 self-stretch">
         {/* Move History */}
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 flex flex-col h-64 shadow-card">
-          <div className="text-xs font-bold uppercase tracking-wider text-slate-500 pb-3 border-b border-slate-100 flex items-center justify-between">
+          <div className="text-xs font-bold text-slate-600 pb-3 border-b border-slate-100 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <History className="w-3.5 h-3.5 text-sky-600" />
               Nước Đi Trận Đấu
             </span>
-            <span className="font-mono tabular-nums text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-bold">
+            <span className="font-mono tabular-nums text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-bold">
               {gameState?.moves?.length || 0}
             </span>
           </div>
@@ -941,13 +957,17 @@ export default function GamePage() {
 
         {/* Chat Panel */}
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 flex-1 flex flex-col shadow-card min-h-[350px]">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-600 pb-3 border-b border-slate-100">
             <MessageSquare className="w-4 h-4 text-sky-600" />
             <span>Trò Chuyện Trong Trận</span>
           </div>
 
           <div
             ref={chatContainerRef}
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions"
+            aria-label="Tin nhắn trò chuyện trong trận"
             className="flex-1 overflow-y-auto my-3 space-y-2.5 text-xs pr-1"
           >
             {chatMessages.length === 0 ? (
@@ -958,12 +978,12 @@ export default function GamePage() {
                   key={msg.id}
                   className={`p-2.5 rounded-xl max-w-[85%] ${
                     msg.senderId === user?.id
-                      ? 'ml-auto bg-sky-600 text-white rounded-br-none shadow-subtle'
+                      ? 'ml-auto bg-sky-700 text-white rounded-br-none shadow-subtle'
                       : 'bg-slate-100 text-slate-800 rounded-bl-none border border-slate-200/60'
                   }`}
                 >
                   <div
-                    className={`font-semibold text-[10px] mb-0.5 ${
+                    className={`font-semibold text-xs mb-0.5 ${
                       msg.senderId === user?.id ? 'text-sky-100' : 'text-slate-500'
                     }`}
                   >
@@ -976,18 +996,22 @@ export default function GamePage() {
           </div>
 
           <form onSubmit={handleSendMessage} className="flex gap-2 pt-2 border-t border-slate-100">
+            <label htmlFor="game-chat-input" className="sr-only">
+              Nhập tin nhắn trò chuyện trong trận
+            </label>
             <input
+              id="game-chat-input"
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder="Nhập tin nhắn..."
               maxLength={500}
-              className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200/90 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:bg-white transition-colors"
+              className="flex-1 min-w-0 min-h-[44px] px-3 py-2 bg-slate-50 border border-slate-200/90 rounded-xl text-base sm:text-sm text-slate-800 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:bg-white focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 transition-colors"
             />
             <button
               type="submit"
               aria-label="Gửi tin nhắn"
-              className="p-2.5 bg-sky-600 hover:bg-sky-700 active:scale-[0.98] text-white rounded-xl shadow-sm transition-all"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center bg-sky-700 hover:bg-sky-800 active:scale-[0.98] text-white rounded-xl shadow-sm transition-colors focus-visible:ring-2 focus-visible:ring-sky-500"
             >
               <Send className="w-3.5 h-3.5" />
             </button>
@@ -997,31 +1021,29 @@ export default function GamePage() {
 
       {/* Incoming Draw Offer Modal */}
       {incomingDrawOffer && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="draw-dialog-title"
-          className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4"
-        >
+        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div
             ref={drawModalRef}
-            className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 text-center shadow-modal animate-in fade-in zoom-in-95 duration-150"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="draw-dialog-title"
+            className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full max-h-[90dvh] overflow-y-auto p-6 text-center shadow-modal animate-in fade-in zoom-in-95 duration-150"
           >
             <Handshake className="w-12 h-12 text-amber-500 mx-auto mb-3" />
-            <h3 id="draw-dialog-title" className="text-lg font-bold text-slate-900 mb-2">Đối Thủ Đề Nghị Hòa</h3>
+            <h2 id="draw-dialog-title" className="text-lg font-bold text-slate-900 mb-2">Đối Thủ Đề Nghị Hòa</h2>
             <p className="text-xs text-slate-500 mb-6 leading-relaxed">
               Kỳ thủ <strong className="text-slate-800">{incomingDrawOffer}</strong> muốn kết thúc trận đấu với kết quả hòa. Bạn có đồng ý không?
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-col-reverse sm:flex-row gap-2.5 sm:gap-3">
               <button
                 onClick={handleRejectDraw}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+                className="flex-1 py-2.5 min-h-[44px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
               >
                 Từ Chối
               </button>
               <button
                 onClick={handleAcceptDraw}
-                className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition-colors shadow-sm"
+                className="flex-1 py-2.5 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white font-bold rounded-xl text-xs transition-colors shadow-sm"
               >
                 Chấp Nhận Hòa
               </button>
@@ -1032,33 +1054,36 @@ export default function GamePage() {
 
       {/* Resign Confirmation Modal */}
       {showResignModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="resign-dialog-title"
-          className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4"
-        >
+        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div
             ref={resignModalRef}
-            className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 text-center shadow-modal animate-in fade-in zoom-in-95 duration-150"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="resign-dialog-title"
+            aria-describedby="resign-dialog-desc"
+            className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full max-h-[90dvh] overflow-y-auto p-6 text-center shadow-modal animate-in fade-in zoom-in-95 duration-150"
           >
             <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-3" />
-            <h3 id="resign-dialog-title" className="text-lg font-bold text-slate-900 mb-2">Xác Nhận Đầu Hàng?</h3>
-            <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-              Bạn có chắc chắn muốn đầu hàng không? Điểm ELO của bạn sẽ bị trừ sau khi chấp nhận thua ván này.
+            <h2 id="resign-dialog-title" className="text-lg font-bold text-slate-900 mb-2">
+              Đầu hàng ván đấu này?
+            </h2>
+            <p id="resign-dialog-desc" className="text-xs text-slate-600 mb-6 leading-relaxed">
+              Ván cờ sẽ kết thúc ngay với phần thắng thuộc về đối thủ và hệ số ELO của bạn sẽ được cập nhật.
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-col-reverse sm:flex-row gap-2.5 sm:gap-3">
               <button
+                type="button"
                 onClick={() => setShowResignModal(false)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+                className="flex-1 py-2.5 min-h-[44px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
               >
-                Tiếp Tục Chơi
+                Tiếp tục chơi
               </button>
               <button
+                type="button"
                 onClick={handleResign}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition-colors shadow-sm"
+                className="flex-1 py-2.5 min-h-[44px] bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition-colors shadow-sm"
               >
-                Đầu Hàng
+                Đầu hàng ván này
               </button>
             </div>
           </div>
@@ -1067,15 +1092,13 @@ export default function GamePage() {
 
       {/* Game Over Modal */}
       {gameOverData && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="gameover-dialog-title"
-          className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4"
-        >
+        <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div
             ref={gameOverModalRef}
-            className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-modal animate-in fade-in zoom-in-95 duration-200"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gameover-dialog-title"
+            className="bg-white border border-slate-200 rounded-3xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-6 sm:p-8 text-center shadow-modal animate-in fade-in zoom-in-95 duration-200"
           >
             <div className="w-16 h-16 bg-sky-50 border border-sky-200 rounded-2xl mx-auto flex items-center justify-center mb-4">
               <Trophy className="w-8 h-8 text-sky-600" />
@@ -1084,14 +1107,14 @@ export default function GamePage() {
             <h2 id="gameover-dialog-title" className="text-2xl font-extrabold text-slate-900 mb-1 tracking-tight">
               Trận Đấu Kết Thúc
             </h2>
-            <div className="text-lg font-bold text-sky-600 mb-1">
+            <div className="text-lg font-bold text-sky-700 mb-1">
               {gameOverData.result === 'WHITE_WON'
                 ? 'Quân Trắng Thắng!'
                 : gameOverData.result === 'BLACK_WON'
                 ? 'Quân Đen Thắng!'
                 : 'Trận Đấu Hòa!'}
             </div>
-            <p className="text-xs text-slate-500 mb-6 uppercase tracking-wider font-semibold">
+            <p className="text-xs text-slate-600 mb-6 font-semibold">
               Lý do: {gameOverData.terminationReason}
             </p>
 
@@ -1105,7 +1128,7 @@ export default function GamePage() {
                   </div>
                   <div
                     className={`font-semibold ${
-                      gameOverData.whiteEloChange >= 0 ? 'text-emerald-700' : 'text-rose-600'
+                      gameOverData.whiteEloChange >= 0 ? 'text-emerald-700' : 'text-rose-700'
                     }`}
                   >
                     {gameOverData.whiteEloChange >= 0 ? '+' : ''}
@@ -1121,7 +1144,7 @@ export default function GamePage() {
                     className={`font-semibold ${
                       gameOverData.blackEloChange !== undefined && gameOverData.blackEloChange >= 0
                         ? 'text-emerald-700'
-                        : 'text-rose-600'
+                        : 'text-rose-700'
                     }`}
                   >
                     {gameOverData.blackEloChange !== undefined && gameOverData.blackEloChange >= 0
@@ -1136,13 +1159,13 @@ export default function GamePage() {
             <div className="flex gap-3">
               <button
                 onClick={() => navigate(`/history?replay=${gameId}`)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors"
+                className="flex-1 py-2.5 min-h-[44px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors"
               >
                 Xem Lại Trận
               </button>
               <button
                 onClick={() => navigate('/lobby')}
-                className="flex-1 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl text-sm shadow-sm transition-all active:scale-[0.98]"
+                className="flex-1 py-2.5 min-h-[44px] bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm shadow-sm transition-colors active:scale-[0.98]"
               >
                 Về Sảnh Chờ
               </button>

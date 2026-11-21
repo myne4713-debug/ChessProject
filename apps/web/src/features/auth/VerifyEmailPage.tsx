@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import { reconnectSocketWithAuth } from '../../services/socket';
-import { Mail, CheckCircle2, AlertCircle, ArrowRight, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Mail, CheckCircle2, AlertCircle, RefreshCw, ShieldCheck } from 'lucide-react';
 import { fireConfetti } from '../../lib/confetti';
 import { PieceSvg } from '../../components/chess/PieceSvg';
 
@@ -107,16 +107,18 @@ export default function VerifyEmailPage() {
   return (
     <div className="flex-1 flex items-center justify-center p-4 py-12">
       <div className="w-full max-w-md bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-8 shadow-card relative">
-        <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-gradient-to-tr from-sky-600 to-blue-700 rounded-xl mx-auto flex items-center justify-center text-white shadow-sm shadow-sky-500/20 mb-3.5">
-            <PieceSvg type="k" color="w" className="w-7 h-7" />
+        <div className="flex items-center gap-3.5 mb-8">
+          <div className="w-11 h-11 shrink-0 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-center text-white shadow-sm">
+            <PieceSvg type="k" color="w" className="w-6 h-6" />
           </div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Xác Minh Email
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Bảo vệ tài khoản và mở khóa tính năng thi đấu xếp hạng ELO
-          </p>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+              Xác Minh Email
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+              Bảo vệ tài khoản và mở khóa tính năng thi đấu xếp hạng ELO
+            </p>
+          </div>
         </div>
 
         {errorMessage && (
@@ -131,7 +133,8 @@ export default function VerifyEmailPage() {
 
         {successMessage && (
           <div
-            role="alert"
+            role="status"
+            aria-live="polite"
             className="mb-6 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm flex items-center gap-2.5 animate-in fade-in duration-150"
           >
             <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
@@ -151,14 +154,13 @@ export default function VerifyEmailPage() {
             <div className="pt-4 flex flex-col gap-2.5">
               <Link
                 to="/lobby"
-                className="w-full py-3 bg-sky-600 hover:bg-sky-700 active:scale-[0.98] font-bold text-white rounded-xl shadow-sm transition-all duration-150 flex items-center justify-center gap-2 text-sm"
+                className="w-full py-3 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] font-bold text-white rounded-xl shadow-sm transition-colors duration-150 flex items-center justify-center gap-2 text-sm"
               >
                 <span>Vào Sảnh Chờ Thi Đấu</span>
-                <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
                 to="/profile"
-                className="w-full py-2.5 border border-slate-200 hover:bg-slate-50 active:scale-[0.98] font-semibold text-slate-700 rounded-xl transition-all duration-150 text-xs sm:text-sm text-center"
+                className="w-full py-2.5 border border-slate-200 hover:bg-slate-50 active:scale-[0.98] font-semibold text-slate-700 rounded-xl transition-colors duration-150 text-xs sm:text-sm text-center"
               >
                 Xem Hồ Sơ Kỳ Thủ
               </Link>
@@ -167,32 +169,34 @@ export default function VerifyEmailPage() {
         ) : (
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+              <label htmlFor="verify-email" className="block text-xs font-semibold text-slate-600 mb-1.5">
                 Địa chỉ Email
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                 <input
+                  id="verify-email"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="tenban@domain.com"
                   required
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200/90 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:bg-white text-base sm:text-sm transition-colors"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200/90 rounded-xl text-slate-900 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:bg-white focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 text-base sm:text-sm transition-colors"
                 />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                <label htmlFor="verify-code" className="text-xs font-semibold text-slate-600">
                   Mã xác minh (OTP 6 số)
                 </label>
                 <button
                   type="button"
                   onClick={handleResend}
                   disabled={countdown > 0 || isResending}
-                  className="text-xs text-sky-600 hover:text-sky-700 font-semibold disabled:text-slate-400 disabled:pointer-events-none flex items-center gap-1"
+                  className="text-xs text-sky-700 hover:text-sky-800 font-semibold disabled:text-slate-500 disabled:pointer-events-none flex items-center gap-1 min-h-[44px] sm:min-h-[32px] px-2 -mr-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
                 >
                   {isResending && <RefreshCw className="w-3 h-3 animate-spin" />}
                   <span>
@@ -201,15 +205,19 @@ export default function VerifyEmailPage() {
                 </button>
               </div>
               <input
+                id="verify-code"
                 type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
                 maxLength={6}
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                aria-describedby="verify-code-hint"
                 placeholder="Ví dụ: 123456"
                 required
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200/90 rounded-xl text-center text-slate-900 font-mono text-xl sm:text-2xl font-bold tracking-widest placeholder-slate-300 focus:outline-none focus:border-sky-500 focus:bg-white tabular-nums transition-colors"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200/90 rounded-xl text-center text-slate-900 font-mono text-xl sm:text-2xl font-bold tracking-widest placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:bg-white focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 tabular-nums transition-colors"
               />
-              <p className="text-[11px] text-slate-600 mt-1.5 text-center">
+              <p id="verify-code-hint" className="text-xs leading-relaxed text-slate-600 mt-1.5 text-center">
                 Mã xác minh gồm 6 số đã được gửi tới hòm thư của bạn và có hiệu lực 15 phút.
               </p>
             </div>
@@ -217,7 +225,7 @@ export default function VerifyEmailPage() {
             <button
               type="submit"
               disabled={isLoading || code.length < 4}
-              className="w-full mt-2 py-3 bg-sky-600 hover:bg-sky-700 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none font-bold text-white rounded-xl shadow-sm transition-all duration-150 flex items-center justify-center gap-2 text-sm"
+              className="w-full mt-2 py-3 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none font-bold text-white rounded-xl shadow-sm transition-colors duration-150 flex items-center justify-center gap-2 text-sm"
             >
               {isLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -233,9 +241,9 @@ export default function VerifyEmailPage() {
 
         <div className="mt-6 pt-6 border-t border-slate-100 text-center flex items-center justify-between text-xs text-slate-500">
           <Link to="/lobby" className="hover:text-slate-800 transition-colors">
-            &larr; Về Sảnh Chờ
+            Quay về sảnh chờ
           </Link>
-          <Link to="/login" className="hover:text-sky-600 font-semibold transition-colors">
+          <Link to="/login" className="hover:text-sky-700 font-semibold transition-colors">
             Đăng nhập tài khoản khác
           </Link>
         </div>

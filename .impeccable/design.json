@@ -1,0 +1,288 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-21T17:17:00+07:00",
+  "title": "Design System: Online Chess",
+  "extensions": {
+    "colorMeta": {
+      "obsidian-ink": {
+        "role": "primary",
+        "displayName": "Obsidian Ink",
+        "canonical": "#0f172a",
+        "tonalRamp": ["#020617", "#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#f1f5f9"]
+      },
+      "tactical-sky": {
+        "role": "primary",
+        "displayName": "Tactical Sky",
+        "canonical": "#0369a1",
+        "tonalRamp": ["#082f49", "#0c4a6e", "#075985", "#0369a1", "#0284c7", "#38bdf8", "#bae6fd", "#f0f9ff"]
+      },
+      "tactical-sky-deep": {
+        "role": "primary",
+        "displayName": "Tactical Sky Deep",
+        "canonical": "#075985",
+        "tonalRamp": ["#082f49", "#0c4a6e", "#075985", "#0369a1", "#0284c7", "#38bdf8", "#bae6fd", "#f0f9ff"]
+      },
+      "focus-sky": {
+        "role": "primary",
+        "displayName": "Focus Sky",
+        "canonical": "#0284c7",
+        "tonalRamp": ["#082f49", "#0c4a6e", "#075985", "#0369a1", "#0284c7", "#38bdf8", "#bae6fd", "#f0f9ff"]
+      },
+      "sky-tint": {
+        "role": "primary",
+        "displayName": "Sky Tint",
+        "canonical": "#f0f9ff",
+        "tonalRamp": ["#082f49", "#0c4a6e", "#075985", "#0369a1", "#0284c7", "#7dd3fc", "#e0f2fe", "#f0f9ff"]
+      },
+      "ice-badge": {
+        "role": "primary",
+        "displayName": "Ice Badge",
+        "canonical": "#e0f2fe",
+        "tonalRamp": ["#082f49", "#0c4a6e", "#075985", "#0369a1", "#38bdf8", "#7dd3fc", "#bae6fd", "#e0f2fe"]
+      },
+      "tournament-blue": {
+        "role": "secondary",
+        "displayName": "Tournament Blue",
+        "canonical": "#4b7399",
+        "tonalRamp": ["#1e3246", "#2c4761", "#3b5d7e", "#4b7399", "#648cb2", "#8bb0d1", "#bed4e7", "#f0f5fa"]
+      },
+      "ice-square": {
+        "role": "secondary",
+        "displayName": "Ice Square",
+        "canonical": "#f0f5fa",
+        "tonalRamp": ["#2c4761", "#4b7399", "#648cb2", "#8bb0d1", "#b0cbe2", "#d0e1ef", "#e4eef7", "#f0f5fa"]
+      },
+      "board-highlight-light": {
+        "role": "secondary",
+        "displayName": "Board Highlight Light",
+        "canonical": "#bae6fd",
+        "tonalRamp": ["#0c4a6e", "#0369a1", "#0284c7", "#0ea5e9", "#38bdf8", "#7dd3fc", "#bae6fd", "#f0f9ff"]
+      },
+      "board-highlight-dark": {
+        "role": "secondary",
+        "displayName": "Board Highlight Dark",
+        "canonical": "#3b6ea5",
+        "tonalRamp": ["#172d47", "#234369", "#2f5987", "#3b6ea5", "#5286bf", "#7aa6d6", "#aecae8", "#e8f1fa"]
+      },
+      "clock-amber": {
+        "role": "tertiary",
+        "displayName": "Clock Amber",
+        "canonical": "#d97706",
+        "tonalRamp": ["#451a03", "#78350f", "#92400e", "#b45309", "#d97706", "#f59e0b", "#fcd34d", "#fffbeb"]
+      },
+      "amber-text": {
+        "role": "tertiary",
+        "displayName": "Amber Text",
+        "canonical": "#b45309",
+        "tonalRamp": ["#451a03", "#78350f", "#92400e", "#b45309", "#d97706", "#f59e0b", "#fcd34d", "#fffbeb"]
+      },
+      "check-crimson": {
+        "role": "tertiary",
+        "displayName": "Check Crimson",
+        "canonical": "#be123c",
+        "tonalRamp": ["#4c0519", "#881337", "#9f1239", "#be123c", "#e11d48", "#fb7185", "#fecdd3", "#fff1f2"]
+      },
+      "victory-emerald": {
+        "role": "tertiary",
+        "displayName": "Victory Emerald",
+        "canonical": "#047857",
+        "tonalRamp": ["#022c22", "#064e3b", "#065f46", "#047857", "#059669", "#34d399", "#a7f3d0", "#ecfdf5"]
+      },
+      "body-slate": {
+        "role": "neutral",
+        "displayName": "Body Slate",
+        "canonical": "#1e293b",
+        "tonalRamp": ["#020617", "#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#cbd5e1", "#f8fafc"]
+      },
+      "secondary-slate": {
+        "role": "neutral",
+        "displayName": "Secondary Slate",
+        "canonical": "#475569",
+        "tonalRamp": ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#f8fafc"]
+      },
+      "muted-slate": {
+        "role": "neutral",
+        "displayName": "Muted Slate",
+        "canonical": "#64748b",
+        "tonalRamp": ["#0f172a", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#e2e8f0", "#f8fafc"]
+      },
+      "hairline-border": {
+        "role": "neutral",
+        "displayName": "Hairline Border",
+        "canonical": "#e2e8f0",
+        "tonalRamp": ["#1e293b", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#e2e8f0", "#f1f5f9", "#f8fafc"]
+      },
+      "subtle-surface": {
+        "role": "neutral",
+        "displayName": "Subtle Surface",
+        "canonical": "#f1f5f9",
+        "tonalRamp": ["#1e293b", "#475569", "#94a3b8", "#cbd5e1", "#e2e8f0", "#f1f5f9", "#f8fafc", "#ffffff"]
+      },
+      "chalk-canvas": {
+        "role": "neutral",
+        "displayName": "Chalk Canvas",
+        "canonical": "#f8fafc",
+        "tonalRamp": ["#0f172a", "#334155", "#64748b", "#94a3b8", "#cbd5e1", "#e2e8f0", "#f1f5f9", "#f8fafc"]
+      },
+      "pure-card": {
+        "role": "neutral",
+        "displayName": "Pure Card",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#1e293b", "#475569", "#94a3b8", "#cbd5e1", "#e2e8f0", "#f1f5f9", "#f8fafc", "#ffffff"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display Hero", "purpose": "Landing page hero headline above the interactive Sicilian demo board." },
+      "headline": { "displayName": "Page Headline", "purpose": "Primary H1 titles across authenticated and tournament views." },
+      "title": { "displayName": "Card & Modal Title", "purpose": "Section headers, match cards, and accessible dialog titles." },
+      "body": { "displayName": "Body Copy", "purpose": "Explanatory paragraphs, game chat messages, and empty-state instructions." },
+      "label": { "displayName": "Control Label", "purpose": "Form labels, navigation pills, action buttons, and metadata tags." },
+      "mono-clock": { "displayName": "Tournament Clock & Notation", "purpose": "Digital countdown clocks, ELO ratings, SAN moves, and room invite codes." }
+    },
+    "shadows": [
+      { "name": "subtle", "value": "0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.03)", "purpose": "Secondary white buttons, captured piece badges, and resting player strips." },
+      { "name": "card", "value": "0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.03)", "purpose": "Feature pillars, leaderboard panels, move history cards, and chessboard frames." },
+      { "name": "card-hover", "value": "0 8px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.03)", "purpose": "Hover elevation lift on public room cards in the lobby." },
+      { "name": "glow-primary", "value": "0 0 24px -4px rgba(2, 132, 199, 0.35)", "purpose": "Reserved strictly for featured tactical focus states." },
+      { "name": "modal", "value": "0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.06)", "purpose": "Draw offer, resign confirmation, pawn promotion, and game-over dialogs." },
+      { "name": "board-inner", "value": "var(--chess-shadow-board, 0 2px 10px -2px rgba(15, 23, 42, 0.05))", "purpose": "Crisp resting lift around interactive react-chessboard grids." }
+    ],
+    "motion": [
+      { "name": "duration-press", "value": "150ms", "purpose": "Snap response for button hover color shifts and 0.96-0.98 press feedback." },
+      { "name": "ease-out-tactile", "value": "cubic-bezier(0, 0, 0.2, 1)", "purpose": "Deceleration curve matching Tailwind ease-out for controls and drawers." },
+      { "name": "duration-eval", "value": "300ms", "purpose": "GPU scaleY/scaleX shift on landing and AI evaluation balance bars." },
+      { "name": "ease-eval-bar", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Confident exponential ease-out for chessboard evaluation indicator changes." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "High-contrast obsidian primary action; one primary filled action per view or card section.",
+      "html": "<button type=\"button\" class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"14.5 17.5 3 6 3 3 6 3 17.5 14.5\"/><line x1=\"13\" y1=\"19\" x2=\"19\" y2=\"13\"/><line x1=\"16\" y1=\"16\" x2=\"20\" y2=\"20\"/><line x1=\"19\" y1=\"21\" x2=\"21\" y2=\"19\"/></svg><span>Vào phòng thi đấu</span></button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 18px; border-radius: 12px; border: none; background: var(--chess-obsidian, #0f172a); color: var(--chess-card, #ffffff); font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); transition: background-color 150ms ease-out, transform 150ms ease-out; } .ds-btn-primary:hover { background: #1e293b; } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--chess-focus, #0284c7); }"
+    },
+    {
+      "name": "Tactical Action Button",
+      "kind": "button",
+      "refersTo": "button-tactical",
+      "description": "Tactical sky button for direct room entry, invite sends, and active in-game confirmation.",
+      "html": "<button type=\"button\" class=\"ds-btn-tactical\"><span>Vào Thách Đấu</span><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m9 18 6-6-6-6\"/></svg></button>",
+      "css": ".ds-btn-tactical { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 10px 16px; border-radius: 12px; border: none; background: var(--chess-primary, #0369a1); color: #ffffff; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); transition: background-color 150ms ease-out, transform 150ms ease-out; } .ds-btn-tactical:hover { background: var(--chess-primary-hover, #075985); } .ds-btn-tactical:active { transform: scale(0.98); } .ds-btn-tactical:focus-visible { outline: none; box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--chess-focus, #0284c7); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Crisp white outline button for neutral actions like training with AI or creating private rooms.",
+      "html": "<button type=\"button\" class=\"ds-btn-secondary\">Tạo phòng mới</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 16px; border-radius: 12px; border: 1px solid #cbd5e1; background: var(--chess-card, #ffffff); color: var(--chess-ink, #1e293b); font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04); transition: background-color 150ms ease-out, border-color 150ms ease-out, transform 150ms ease-out; } .ds-btn-secondary:hover { background: var(--chess-bg, #f8fafc); border-color: #94a3b8; } .ds-btn-secondary:active { transform: scale(0.98); } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--chess-focus, #0284c7); }"
+    },
+    {
+      "name": "Time Control Chip",
+      "kind": "chip",
+      "refersTo": "chip-time-control",
+      "description": "Monospace time-control toggle chip with selected obsidian inversion and mobile 44px hit height.",
+      "html": "<div class=\"ds-chip-group\"><button type=\"button\" aria-pressed=\"true\" class=\"ds-chip ds-chip-active\">5+0 Blitz</button><button type=\"button\" aria-pressed=\"false\" class=\"ds-chip\">10+0 Rapid</button></div>",
+      "css": ".ds-chip-group { display: flex; gap: 6px; } .ds-chip { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--chess-border, #e2e8f0); background: var(--chess-bg, #f8fafc); color: var(--chess-ink, #1e293b); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; font-weight: 600; cursor: pointer; transition: background-color 150ms ease-out, color 150ms ease-out; } .ds-chip:hover { background: var(--chess-surface, #f1f5f9); } .ds-chip-active, .ds-chip-active:hover { background: var(--chess-obsidian, #0f172a); border-color: var(--chess-obsidian, #0f172a); color: #ffffff; font-weight: 700; } .ds-chip:focus-visible { outline: none; box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--chess-focus, #0284c7); }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Glare-free search and auth input keeping readable Slate-500 placeholders and sky focus rings.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-label\" for=\"ds-room-input\">Mã phòng mời</label><input id=\"ds-room-input\" class=\"ds-input\" type=\"text\" placeholder=\"VD: K8X9B2\" /></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; width: 260px; } .ds-label { font-size: 12px; font-weight: 600; color: #334155; } .ds-input { width: 100%; min-height: 44px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--chess-border, #e2e8f0); background: var(--chess-bg, #f8fafc); color: var(--chess-obsidian, #0f172a); font-size: 14px; transition: background-color 150ms ease-out, border-color 150ms ease-out; } .ds-input::placeholder { color: var(--chess-ink-muted, #64748b); opacity: 1; } .ds-input:focus { outline: none; background: var(--chess-card, #ffffff); border-color: var(--chess-focus, #0284c7); box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--chess-focus, #0284c7); }"
+    },
+    {
+      "name": "Match Info Card",
+      "kind": "card",
+      "refersTo": "card-surface",
+      "description": "Primary card container framed with 16px corners, hairline border, and subtle slate elevation.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-head\"><span class=\"ds-card-title\">Ghép Cặp Tự Động</span><span class=\"ds-badge\">24 trực tuyến</span></div><p class=\"ds-card-body\">Tìm đối thủ cùng khoảng ELO và vào bàn ngay khi đủ cặp.</p></div>",
+      "css": ".ds-card { max-width: 340px; padding: 20px 24px; border-radius: 16px; border: 1px solid var(--chess-border, #e2e8f0); background: var(--chess-card, #ffffff); box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.03); } .ds-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; } .ds-card-title { font-size: 16px; font-weight: 700; color: var(--chess-obsidian, #0f172a); letter-spacing: -0.02em; } .ds-badge { padding: 2px 8px; border-radius: 9999px; background: var(--chess-accent-light, #f0f9ff); color: var(--chess-primary, #0369a1); border: 1px solid var(--chess-ice, #e0f2fe); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 700; } .ds-card-body { margin: 0; font-size: 13px; line-height: 1.5; color: #475569; }"
+    },
+    {
+      "name": "Top Navigation Bar",
+      "kind": "nav",
+      "refersTo": "button-primary",
+      "description": "Sticky application header with obsidian brand emblem, active route pill, and ELO profile trigger.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-brand\"><span class=\"ds-brand-mark\">K</span>Online Chess</span><div class=\"ds-nav-links\"><a href=\"#lobby\" class=\"ds-nav-link ds-nav-active\" aria-current=\"page\">Sảnh chờ</a><a href=\"#ai\" class=\"ds-nav-link\">Đấu với Máy</a><span class=\"ds-elo-pill\">1550 ELO</span></div></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 56px; padding: 0 16px; background: rgba(255, 255, 255, 0.95); border: 1px solid var(--chess-border, #e2e8f0); border-radius: 16px; } .ds-brand { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: var(--chess-obsidian, #0f172a); letter-spacing: -0.02em; } .ds-brand-mark { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; background: var(--chess-obsidian, #0f172a); color: #ffffff; font-size: 13px; } .ds-nav-links { display: flex; align-items: center; gap: 6px; } .ds-nav-link { padding: 7px 12px; border-radius: 10px; font-size: 13px; font-weight: 500; color: #475569; text-decoration: none; transition: background-color 150ms ease-out, color 150ms ease-out; } .ds-nav-link:hover { background: var(--chess-surface, #f1f5f9); color: var(--chess-obsidian, #0f172a); } .ds-nav-active { background: var(--chess-accent-light, #f0f9ff); color: var(--chess-primary, #0369a1); font-weight: 600; } .ds-elo-pill { padding: 3px 10px; border-radius: 9999px; background: var(--chess-accent-light, #f0f9ff); color: var(--chess-primary, #0369a1); border: 1px solid var(--chess-ice, #e0f2fe); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Tournament Player Clock",
+      "kind": "custom",
+      "refersTo": "clock-active",
+      "description": "Isolated tabular-nums digital clock with active tactical sky turn indicator and resting slate state.",
+      "html": "<div class=\"ds-clocks\"><div class=\"ds-clock ds-clock-active\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><polyline points=\"12 6 12 12 16 14\"/></svg><span>04:32</span></div><div class=\"ds-clock ds-clock-urgent\">00:18</div></div>",
+      "css": ".ds-clocks { display: flex; align-items: center; gap: 10px; } .ds-clock { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; } .ds-clock-active { background: var(--chess-primary, #0369a1); color: #ffffff; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); } .ds-clock-urgent { background: var(--chess-danger, #be123c); color: #ffffff; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Tournament Chess Hall",
+    "overview": "Online Chess embodies the discipline and clarity of an international tournament hall. Every layout centers attention on the 64-square arena, while surrounding player cards, digital clocks, notation sheets, and matchmaking queues remain calm, glare-free, and strictly utilitarian so nothing competes with move calculation.\n\nThe visual system rejects generic SaaS decoration—no rainbow hero gradients, no heavy drop shadows, and no ambiguous status dots without labels. Contrast comes from crisp obsidian controls anchored on cool chalk-white surfaces, punctuated sparingly by tactical sky highlights for legal moves, selected pieces, and keyboard focus.",
+    "keyCharacteristics": [
+      "**Board-first hierarchy:** The square board dominates visual contrast while clocks, notation grids, and sidebars recede cleanly into slate-tinted surfaces.",
+      "**Tactile precision:** Interactive controls respond within 150ms (`0.96`–`0.98` active press scale) and maintain at least a `44px` minimum touch target on mobile viewports.",
+      "**Tabular tournament telemetry:** All digital clocks, ELO ratings, move counters, and room codes lock onto monospace tabular digits to prevent horizontal jitter during live countdowns.",
+      "**Token-driven themes:** Semantic CSS custom properties in `:root` and `:root[data-theme=\"dark\"], .dark` govern light canvases, board squares, highlights, piece silhouettes, and focus rings without hard-coded component colors."
+    ],
+    "rules": [
+      {
+        "name": "The One Primary Action Rule",
+        "body": "Limit each view or card group to one Obsidian filled primary button; secondary actions remain chalk-white with hairline slate borders or neutral tint fills.",
+        "section": "colors"
+      },
+      {
+        "name": "The Paired Status Rule",
+        "body": "Never convey check, draw offers, clock urgency, or account locks by color alone—pair semantic tints with explicit text labels or icons.",
+        "section": "colors"
+      },
+      {
+        "name": "The Single Token Source Rule",
+        "body": "Define colors exclusively via Tailwind design tokens or CSS custom properties (`--chess-*`); never scatter raw hex or `rgba()` literals inside feature components (excluding external third-party brand logos).",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Lock Rule",
+        "body": "Apply monospace tabular figures (`font-mono tabular-nums`) to every live clock, timer, ELO score, rank, and ply index so digits never shift sideways mid-game.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "Use natural sentence case for controls and labels; avoid shouting uppercase micro-labels over standard UI fields.",
+        "section": "typography"
+      },
+      {
+        "name": "The Mobile Auto-Zoom Floor Rule",
+        "body": "Keep form inputs at `16px` on mobile viewports stepping down to `14px` on desktop (`text-base sm:text-sm`) to prevent Safari auto-zoom.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Restful surfaces rely on border contrast and chalk-vs-white separation first; deeper elevation is reserved for interactive hover lift and blocking modal overlays.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep every interactive control's tap area at least `44×44px` on touch devices while hiding verbose toolbar labels only when accompanied by clear `aria-label` descriptions.",
+      "**Do** wrap every interactive dialog inside `useDialogFocusTrap`, pair form inputs with explicit `<label htmlFor>`, and drive every chessboard color from `--chess-*` CSS tokens.",
+      "**Do** preserve `tabular-nums font-mono` on all clocks, ELO badges, rank positions, and SAN move coordinates.",
+      "**Do** honor `prefers-reduced-motion: reduce` in both CSS transitions and JavaScript celebration effects (`fireConfetti`)."
+    ],
+    "donts": [
+      "**Don't** place `touch-none` on read-only replay or landing demo chessboards, or vertical touch scrolling gets trapped on mobile viewports.",
+      "**Don't** animate layout geometry or scatter raw `#hex` / `rgba()` color values directly inside JSX components when semantic `--chess-*` CSS variables or Tailwind `chess.*` tokens exist.",
+      "**Don't** introduce arbitrary gradient text headlines, multiple competing primary solid buttons in the same section, or decorative uppercase eyebrow labels (`kicker-above-heading`).",
+      "**Don't** drop mobile `<input>` font sizes below `16px`, which triggers unwanted Safari viewport zooming."
+    ]
+  }
+}

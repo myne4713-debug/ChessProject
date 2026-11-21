@@ -3,6 +3,93 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --chess-bg: #f8fafc;
+    --chess-card: #ffffff;
+    --chess-surface: #f1f5f9;
+    --chess-border: #e2e8f0;
+    --chess-obsidian: #0f172a;
+    --chess-ink: #1e293b;
+    --chess-ink-muted: #64748b;
+
+    --chess-primary: #0369a1;
+    --chess-primary-hover: #075985;
+    --chess-focus: #0284c7;
+    --chess-accent: #38bdf8;
+    --chess-accent-light: #f0f9ff;
+    --chess-ice: #e0f2fe;
+    --chess-clock-amber: #d97706;
+    --chess-danger: #be123c;
+    --chess-success: #047857;
+
+    --chess-board-light: #f0f5fa;
+    --chess-board-dark: #4b7399;
+    --chess-board-highlight-light: #bae6fd;
+    --chess-board-highlight-dark: #3b6ea5;
+    --chess-board-last-from: rgba(56, 189, 248, 0.25);
+    --chess-board-last-to: rgba(56, 189, 248, 0.38);
+    --chess-board-selected-bg: rgba(14, 165, 233, 0.32);
+    --chess-board-selected-ring: #0284c7;
+    --chess-board-hint-dot: rgba(14, 165, 233, 0.75);
+    --chess-board-capture-ring: rgba(239, 68, 68, 0.65);
+    --chess-board-check-inner: rgba(239, 68, 68, 0.9);
+    --chess-board-check-outer: rgba(239, 68, 68, 0.45);
+    --chess-shadow-board: 0 2px 10px -2px rgba(15, 23, 42, 0.05);
+
+    --chess-piece-white-fill: #ffffff;
+    --chess-piece-white-stroke: #475569;
+    --chess-piece-black-fill: #1e293b;
+    --chess-piece-black-stroke: #0f172a;
+    --chess-focus-halo: #ffffff;
+    --chess-scrollbar-thumb: #cbd5e1;
+    --chess-scrollbar-thumb-hover: #94a3b8;
+    --chess-tap-highlight: rgba(2, 132, 199, 0.14);
+  }
+
+  :root[data-theme='dark'],
+  .dark {
+    --chess-bg: #0b1120;
+    --chess-card: #111827;
+    --chess-surface: #1e293b;
+    --chess-border: #334155;
+    --chess-obsidian: #f8fafc;
+    --chess-ink: #f1f5f9;
+    --chess-ink-muted: #94a3b8;
+
+    --chess-primary: #38bdf8;
+    --chess-primary-hover: #0ea5e9;
+    --chess-focus: #38bdf8;
+    --chess-accent: #7dd3fc;
+    --chess-accent-light: #082f49;
+    --chess-ice: #0c4a6e;
+    --chess-clock-amber: #fbbf24;
+    --chess-danger: #fb7185;
+    --chess-success: #34d399;
+
+    --chess-board-light: #cbd5e1;
+    --chess-board-dark: #335c81;
+    --chess-board-highlight-light: #7dd3fc;
+    --chess-board-highlight-dark: #2563eb;
+    --chess-board-last-from: rgba(56, 189, 248, 0.28);
+    --chess-board-last-to: rgba(56, 189, 248, 0.42);
+    --chess-board-selected-bg: rgba(56, 189, 248, 0.36);
+    --chess-board-selected-ring: #38bdf8;
+    --chess-board-hint-dot: rgba(56, 189, 248, 0.8);
+    --chess-board-capture-ring: rgba(248, 113, 113, 0.72);
+    --chess-board-check-inner: rgba(248, 113, 113, 0.92);
+    --chess-board-check-outer: rgba(248, 113, 113, 0.48);
+    --chess-shadow-board: 0 2px 12px -2px rgba(2, 6, 23, 0.45);
+
+    --chess-piece-white-fill: #f8fafc;
+    --chess-piece-white-stroke: #334155;
+    --chess-piece-black-fill: #0f172a;
+    --chess-piece-black-stroke: #cbd5e1;
+    --chess-focus-halo: #0b1120;
+    --chess-scrollbar-thumb: #475569;
+    --chess-scrollbar-thumb-hover: #64748b;
+    --chess-tap-highlight: rgba(56, 189, 248, 0.2);
+  }
+
   html {
     scroll-behavior: smooth;
     text-rendering: optimizeLegibility;
@@ -13,7 +100,8 @@
   body {
     @apply bg-slate-50 text-slate-800 min-h-screen antialiased selection:bg-sky-100 selection:text-sky-950;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background-color: #f8fafc;
+    background-color: var(--chess-bg);
+    color: var(--chess-ink);
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -21,10 +109,20 @@
     text-wrap: balance;
   }
 
+  p {
+    text-wrap: pretty;
+  }
+
   /* Improve keyboard accessibility focus rings across all standard controls */
   :focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #0284c7;
+    box-shadow: 0 0 0 2px var(--chess-focus-halo), 0 0 0 4px var(--chess-focus);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--chess-ink-muted);
+    opacity: 1;
   }
 }
 
@@ -44,22 +142,73 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--chess-scrollbar-thumb);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--chess-scrollbar-thumb-hover);
 }
 
-/* Respect user's motion preferences across all animations, transitions, and scroll effects */
+/* Respect user's motion preferences: reduce spatial movement while preserving meaningful state feedback */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-pulse,
+  .animate-ping {
+    animation: none !important;
+  }
+
+  .animate-spin {
+    animation-duration: 1.8s !important;
+  }
+
+  .animate-in {
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-enter-scale: 1 !important;
+    --tw-enter-rotate: 0 !important;
+    animation-duration: 140ms !important;
+  }
+
+  [class*="active:scale"],
+  [class*="hover:scale"],
+  [class*="group-hover:scale"] {
+    transform: none !important;
+  }
+
+  .motion-eval-bar {
     transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  }
+}
+
+@layer utilities {
+  .safe-x {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .safe-bottom {
+    padding-bottom: max(2.5rem, calc(2.5rem + env(safe-area-inset-bottom)));
+  }
+
+  .board-touch-surface {
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  .motion-eval-bar {
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@media (pointer: coarse) {
+  button,
+  a {
+    -webkit-tap-highlight-color: var(--chess-tap-highlight);
   }
 }

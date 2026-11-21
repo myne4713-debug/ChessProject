@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { useAuthStore } from '../stores/authStore';
+import { useAuthStore, registerSocketDisconnectHandler } from '../stores/authStore';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || '/';
 
@@ -34,3 +34,5 @@ export function disconnectSocket() {
     socket = null;
   }
 }
+
+registerSocketDisconnectHandler(disconnectSocket);

@@ -1,14 +1,18 @@
 import axios from 'axios';
 import { useAuthStore } from '../stores/authStore';
-
-const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
+import { resolveApiBaseUrl, setStoredDesktopServerUrl } from '../lib/desktop';
 
 export const api = axios.create({
-  baseURL: API_URL,
+  baseURL: resolveApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+export function updateApiServerUrl(serverUrl: string) {
+  const clean = setStoredDesktopServerUrl(serverUrl);
+  api.defaults.baseURL = `${clean}/api/v1`;
+}
 
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;

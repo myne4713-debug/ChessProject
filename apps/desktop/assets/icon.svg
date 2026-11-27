@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="#0f172a" />
+  <rect x="24" y="24" width="464" height="464" rx="104" stroke="#334155" stroke-width="6" />
+  <!-- Subtle tactical sky accent arc at top -->
+  <path d="M128 32 H384" stroke="#0284c7" stroke-width="6" stroke-linecap="round" opacity="0.7" />
+  <!-- Classic Staunton King Cross -->
+  <rect x="241" y="78" width="30" height="86" rx="8" fill="#ffffff" />
+  <rect x="214" y="102" width="84" height="28" rx="8" fill="#ffffff" />
+  <!-- Crown Finial -->
+  <ellipse cx="256" cy="184" rx="28" ry="20" fill="#ffffff" />
+  <!-- Crown Lobes (Left, Center, Right) -->
+  <path
+    d="M150 328
+       C112 292, 102 238, 134 206
+       C164 176, 212 198, 232 236
+       C238 206, 274 206, 280 236
+       C300 198, 348 176, 378 206
+       C410 238, 400 292, 362 328 Z"
+    fill="#ffffff"
+  />
+  <!-- Inner Crown Accent Cutouts -->
+  <path d="M158 310 C196 292, 316 292, 354 310" stroke="#0f172a" stroke-width="10" stroke-linecap="round" />
+  <!-- Collar Band -->
+  <rect x="148" y="328" width="216" height="30" rx="12" fill="#f1f5f9" />
+  <!-- Pedestal Base -->
+  <path d="M132 374 C132 364, 140 358, 150 358 H362 C372 358, 380 364, 380 374 V392 C380 404, 370 414, 358 414 H154 C142 414, 132 404, 132 392 Z" fill="#ffffff" />
+  <rect x="120" y="406" width="272" height="22" rx="11" fill="#e2e8f0" />
+</svg>

@@ -20,6 +20,11 @@ export function isOriginAllowed(origin: string | undefined): boolean {
     return true;
   }
 
+  // Allow Electron desktop custom protocol origin
+  if (origin === 'app://online-chess') {
+    return true;
+  }
+
   // Allow localhost, 127.0.0.1 and IPv6 loopback
   if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin)) {
     return true;

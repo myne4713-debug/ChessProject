@@ -1,0 +1,36 @@
+{
+  "name": "@online-chess/desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Native Electron desktop application for Online Chess Platform",
+  "author": "Online Chess Contributors",
+  "license": "MIT",
+  "main": "dist/main.js",
+  "scripts": {
+    "build:main": "tsc -p tsconfig.json",
+    "prepare:renderer": "node scripts/prepare-renderer.cjs",
+    "build": "npm run build:main && npm run prepare:renderer",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "start": "electron .",
+    "dev": "concurrently -k -n WEB,ELECTRON -c cyan,yellow \"npm run dev --workspace=apps/web\" \"wait-on http://localhost:5173 && npm run build:main && cross-env ELECTRON_RENDERER_URL=http://localhost:5173 electron .\"",
+    "dev:full": "concurrently -k -n SERVER,WEB,ELECTRON -c green,cyan,yellow \"npm run dev --workspace=apps/server\" \"npm run dev --workspace=apps/web\" \"wait-on http://localhost:5173 && npm run build:main && cross-env ELECTRON_RENDERER_URL=http://localhost:5173 electron .\"",
+    "icons:generate": "electron scripts/generate-icons.cjs",
+    "ensure:electron": "node scripts/ensure-electron-binary.cjs",
+    "pack": "npm run build && electron-builder --dir --config electron-builder.yml",
+    "dist": "npm run build && electron-builder --config electron-builder.yml",
+    "dist:win": "npm run build && electron-builder --win --config electron-builder.yml",
+    "dist:mac": "npm run build && electron-builder --mac --config electron-builder.yml",
+    "dist:linux": "npm run build && electron-builder --linux --config electron-builder.yml"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^35.2.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0",
+    "wait-on": "^8.0.3"
+  }
+}

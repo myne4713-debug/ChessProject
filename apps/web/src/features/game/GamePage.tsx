@@ -7,6 +7,7 @@ import { api } from '../../services/api';
 import { getSocket } from '../../services/socket';
 import { useAuthStore } from '../../stores/authStore';
 import { soundManager } from '../../lib/sound';
+import { buildShareInviteLink, notifyDesktop } from '../../lib/desktop';
 import { useDialogFocusTrap } from '../../hooks/useDialogFocusTrap';
 import { findKingSquare } from '../../lib/chessUtils';
 import {
@@ -193,6 +194,11 @@ export default function GamePage() {
 
     const handleMatchFound = (data: any) => {
       if (data?.gameId) {
+        notifyDesktop({
+          title: 'Trận đấu đã bắt đầu!',
+          body: 'Đối thủ đã vào phòng. Nhấn để quay lại bàn cờ.',
+          route: `/game/${data.gameId}`,
+        });
         navigate(`/game/${data.gameId}`);
       }
     };
@@ -232,7 +238,7 @@ export default function GamePage() {
 
   const copyInviteLink = () => {
     if (roomCodeParam) {
-      const link = `${window.location.origin}/lobby?join=${roomCodeParam}`;
+      const link = buildShareInviteLink(roomCodeParam);
       navigator.clipboard.writeText(link);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
@@ -306,6 +312,15 @@ export default function GamePage() {
 
       setGameState((prev) => {
         if (!prev) return prev;
+        const userColor =
+          prev.whitePlayerId === user?.id ? 'w' : prev.blackPlayerId === user?.id ? 'b' : null;
+        if (!payload.isGameOver && userColor && payload.currentTurn === userColor) {
+          notifyDesktop({
+            title: payload.isCheck ? 'Chiếu tướng — Đến lượt bạn đi!' : 'Đến lượt bạn đi',
+            body: `Đối thủ vừa đi ${payload.move.san}.`,
+            route: `/game/${gameId}`,
+          });
+        }
         return {
           ...prev,
           currentFen: payload.fen,
@@ -330,6 +345,16 @@ export default function GamePage() {
       setPossibleMoves([]);
       setCaptureMoves(new Set());
       soundManager.play('gameover');
+      notifyDesktop({
+        title: 'Ván đấu đã kết thúc',
+        body:
+          payload.winnerId === user?.id
+            ? 'Chúc mừng bạn đã giành chiến thắng!'
+            : payload.result === 'DRAW'
+            ? 'Trận đấu kết thúc với kết quả hòa.'
+            : 'Trận đấu đã kết thúc. Nhấn để xem kết quả.',
+        route: `/game/${gameId}`,
+      });
       if (payload.winnerId === user?.id) {
         fireConfetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
       }
@@ -341,6 +366,11 @@ export default function GamePage() {
 
     const handleDrawOffered = (data: { offeredBy: string }) => {
       setIncomingDrawOffer(data.offeredBy);
+      notifyDesktop({
+        title: 'Lời mời hòa',
+        body: 'Đối thủ vừa gửi đề nghị hòa ván cờ.',
+        route: `/game/${gameId}`,
+      });
     };
 
     const handleError = (err?: { message?: string }) => {

@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { PieceSvg } from '../components/chess/PieceSvg';
+import { DesktopShellBar } from '../components/desktop/DesktopShellBar';
+import { isElectronDesktop } from '../lib/desktop';
 
 const LandingPage = lazy(() => import('../features/home/LandingPage'));
 
@@ -100,6 +102,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-chess-bg text-slate-800 antialiased selection:bg-sky-100 selection:text-sky-900">
+      <DesktopShellBar />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2.5 focus:rounded-xl focus:bg-slate-900 focus:text-white focus:text-sm focus:font-bold focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
@@ -107,7 +110,11 @@ export default function App() {
         Chuyển đến nội dung chính
       </a>
       {/* Header / Navigation Bar */}
-      <header className="border-b border-slate-200/90 bg-white/95 backdrop-blur-md sticky top-0 z-50 transition-colors safe-x">
+      <header
+        className={`border-b border-slate-200/90 bg-white/95 backdrop-blur-md sticky ${
+          isElectronDesktop() ? 'top-9' : 'top-0'
+        } z-50 transition-colors safe-x`}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           {/* Brand Logo */}
           <Link

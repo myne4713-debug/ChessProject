@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import { getSocket } from '../../services/socket';
 import { useAuthStore } from '../../stores/authStore';
 import { useDialogFocusTrap } from '../../hooks/useDialogFocusTrap';
+import { notifyDesktop } from '../../lib/desktop';
 import { RoomData, TIME_CONTROLS, SOCKET_EVENTS } from '@online-chess/shared';
 import {
   Plus,
@@ -94,6 +95,11 @@ export default function LobbyPage() {
   useEffect(() => {
     const handleMatchFound = (data: { gameId: string }) => {
       setIsSearchingMatch(false);
+      notifyDesktop({
+        title: 'Đã tìm thấy đối thủ!',
+        body: 'Ván cờ của bạn đã sẵn sàng.',
+        route: `/game/${data.gameId}`,
+      });
       navigate(`/game/${data.gameId}`);
     };
 

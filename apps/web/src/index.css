@@ -204,6 +204,14 @@
   .motion-eval-bar {
     transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   }
+
+  .desktop-drag-region {
+    -webkit-app-region: drag;
+  }
+
+  .desktop-no-drag {
+    -webkit-app-region: no-drag;
+  }
 }
 
 @media (pointer: coarse) {

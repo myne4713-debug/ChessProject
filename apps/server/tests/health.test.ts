@@ -31,4 +31,12 @@ describe('Server Foundation & Health Check', () => {
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
   });
+
+  it('CORS should accept Electron desktop app://online-chess origin', async () => {
+    const res = await request(app)
+      .get('/api/v1/health')
+      .set('Origin', 'app://online-chess');
+    expect(res.status).toBe(200);
+    expect(res.headers['access-control-allow-origin']).toBe('app://online-chess');
+  });
 });

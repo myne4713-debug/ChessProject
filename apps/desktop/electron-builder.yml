@@ -1,0 +1,46 @@
+appId: com.onlinechess.desktop
+productName: Online Chess
+copyright: Copyright © 2026 Online Chess Contributors
+directories:
+  output: release
+  buildResources: assets
+asar: true
+files:
+  - dist/**/*
+  - renderer/**/*
+  - assets/**/*
+  - package.json
+  - "!node_modules/**/*"
+protocols:
+  - name: Online Chess Invite Link
+    schemes:
+      - online-chess
+win:
+  icon: assets/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Online Chess
+portable:
+  artifactName: OnlineChess-${version}-portable.exe
+mac:
+  icon: assets/icon.png
+  category: public.app-category.board-games
+  target:
+    - dmg
+    - zip
+linux:
+  icon: assets/icon.png
+  category: Game
+  target:
+    - AppImage
+    - deb

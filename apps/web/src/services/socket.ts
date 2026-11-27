@@ -1,14 +1,14 @@
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore, registerSocketDisconnectHandler } from '../stores/authStore';
+import { resolveSocketBaseUrl, setStoredDesktopServerUrl } from '../lib/desktop';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || '/';
-
+let socketUrl = resolveSocketBaseUrl();
 let socket: Socket | null = null;
 
 export function getSocket(): Socket {
   if (!socket) {
     const token = useAuthStore.getState().token;
-    socket = io(SOCKET_URL, {
+    socket = io(socketUrl, {
       auth: { token },
       autoConnect: true,
       reconnection: true,
@@ -17,6 +17,17 @@ export function getSocket(): Socket {
     });
   }
   return socket;
+}
+
+export function updateSocketServerUrl(nextServerUrl: string) {
+  const clean = setStoredDesktopServerUrl(nextServerUrl);
+  if (clean === socketUrl) return;
+  socketUrl = clean;
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+    getSocket();
+  }
 }
 
 export function reconnectSocketWithAuth() {

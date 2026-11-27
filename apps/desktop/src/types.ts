@@ -41,6 +41,7 @@ export interface DesktopAppInfo {
   nodeVersion: string;
   platform: NodeJS.Platform;
   isDev: boolean;
+  defaultServerUrl: string;
 }
 
 export interface WindowUIState {

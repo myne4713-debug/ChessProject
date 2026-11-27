@@ -12,6 +12,24 @@
 - **Ghi nhớ vị trí & kích thước cửa sổ**: tự động phục hồi kích thước cửa sổ và bảo vệ tọa độ khi tháo màn hình phụ.
 - **Bảo mật chuẩn Electron**: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, giao thức nội bộ `app://online-chess` chống path traversal, và kiểm soát chặt điều hướng / popup ngoài.
 
+## Cấu hình URL máy chủ khi build (`.env`)
+
+Để file `.exe` sau khi đóng gói tự động kết nối thẳng tới máy chủ bạn đã deploy:
+
+1. Mở file `apps/desktop/.env` (hoặc tạo từ `apps/desktop/.env.example`):
+   ```env
+   DESKTOP_SERVER_URL=https://chess.yourdomain.com
+   ```
+   *(Thứ tự ưu tiên khi build: biến môi trường CLI > `apps/desktop/.env.production` > `apps/desktop/.env` > `.env` ở root > `http://localhost:4000`.)*
+2. Đóng gói lại file `.exe`:
+   ```bash
+   npm run dist:desktop:win
+   ```
+   Script build sẽ tự động:
+   - Ghi URL mặc định vào `apps/desktop/dist/build-config.json` (được đóng gói trong `app.asar`).
+   - Biên dịch `apps/web` với `VITE_API_URL=<DESKTOP_SERVER_URL>/api/v1` và `VITE_SOCKET_URL=<DESKTOP_SERVER_URL>`.
+   - Đóng gói ra các file `.exe` trong `apps/desktop/release/`.
+
 ## Lệnh phát triển & đóng gói
 
 Chạy từ thư mục gốc monorepo:

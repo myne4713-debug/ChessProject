@@ -394,10 +394,12 @@ export function DesktopShellBar() {
                   </label>
                   <button
                     type="button"
-                    onClick={() => setDraftServerUrl('http://localhost:4000')}
+                    onClick={() =>
+                      setDraftServerUrl(appInfo?.defaultServerUrl || DEFAULT_SETTINGS.serverUrl)
+                    }
                     className="text-xs font-medium text-sky-700 hover:text-sky-900 underline-offset-2 hover:underline"
                   >
-                    Dùng mặc định cục bộ
+                    Khôi phục mặc định
                   </button>
                 </div>
 
@@ -408,7 +410,7 @@ export function DesktopShellBar() {
                     type="url"
                     value={draftServerUrl}
                     onChange={(e) => setDraftServerUrl(e.target.value)}
-                    placeholder="http://localhost:4000"
+                    placeholder={appInfo?.defaultServerUrl || DEFAULT_SETTINGS.serverUrl}
                     required
                     className="flex-1 min-w-0 min-h-[44px] px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-mono text-slate-900 focus:bg-white focus:border-sky-600 focus:outline-none"
                   />

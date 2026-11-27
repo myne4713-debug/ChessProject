@@ -1,8 +1,9 @@
 import fs from 'fs';
 import path from 'path';
+import { FALLBACK_SERVER_URL, loadBakedBuildConfig } from './buildConfig';
 import { DesktopSettings, DesktopThemeMode } from './types';
 
-export const DEFAULT_SERVER_URL = 'http://localhost:4000';
+export const DEFAULT_SERVER_URL = FALLBACK_SERVER_URL;
 
 const VALID_THEMES = new Set<DesktopThemeMode>(['light', 'dark', 'system']);
 
@@ -32,8 +33,13 @@ export function normalizeServerUrl(rawUrl: string): string {
   return `${parsed.origin}${pathname}`;
 }
 
-export function getDefaultSettings(env: NodeJS.ProcessEnv = process.env): DesktopSettings {
-  const envCandidate = env.ONLINE_CHESS_SERVER_URL || env.VITE_SOCKET_URL || DEFAULT_SERVER_URL;
+export function getDefaultSettings(
+  env: NodeJS.ProcessEnv = process.env,
+  bakedDefaultUrl?: string
+): DesktopSettings {
+  const fallbackBase = bakedDefaultUrl || loadBakedBuildConfig().defaultServerUrl || DEFAULT_SERVER_URL;
+  const envCandidate =
+    env.DESKTOP_SERVER_URL || env.ONLINE_CHESS_SERVER_URL || env.VITE_SOCKET_URL || fallbackBase;
   let serverUrl = DEFAULT_SERVER_URL;
   try {
     serverUrl = normalizeServerUrl(envCandidate);
@@ -77,15 +83,21 @@ export function sanitizeSettingsPatch(
 
 export class DesktopSettingsStore {
   private readonly filePath: string;
+  private readonly defaultServerUrl: string;
   private settings: DesktopSettings;
 
-  constructor(filePath: string, env: NodeJS.ProcessEnv = process.env) {
+  constructor(
+    filePath: string,
+    env: NodeJS.ProcessEnv = process.env,
+    bakedDefaultUrl?: string
+  ) {
     this.filePath = filePath;
-    this.settings = this.load(env);
+    const defaults = getDefaultSettings(env, bakedDefaultUrl);
+    this.defaultServerUrl = defaults.serverUrl;
+    this.settings = this.load(defaults);
   }
 
-  private load(env: NodeJS.ProcessEnv): DesktopSettings {
-    const defaults = getDefaultSettings(env);
+  private load(defaults: DesktopSettings): DesktopSettings {
     try {
       if (!fs.existsSync(this.filePath)) {
         return defaults;
@@ -96,6 +108,10 @@ export class DesktopSettingsStore {
     } catch {
       return defaults;
     }
+  }
+
+  getDefaultServerUrl(): string {
+    return this.defaultServerUrl;
   }
 
   get(): DesktopSettings {

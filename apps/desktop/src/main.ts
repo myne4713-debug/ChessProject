@@ -321,6 +321,7 @@ function registerIpcHandlers(): void {
     nodeVersion: process.versions.node,
     platform: process.platform,
     isDev,
+    defaultServerUrl: settingsStore!.getDefaultServerUrl(),
   }));
 
   ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, (): DesktopSettings => settingsStore!.get());

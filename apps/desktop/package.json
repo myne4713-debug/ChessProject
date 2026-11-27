@@ -7,7 +7,7 @@
   "license": "MIT",
   "main": "dist/main.js",
   "scripts": {
-    "build:main": "tsc -p tsconfig.json",
+    "build:main": "tsc -p tsconfig.json && node scripts/generate-build-config.cjs",
     "prepare:renderer": "node scripts/prepare-renderer.cjs",
     "build": "npm run build:main && npm run prepare:renderer",
     "lint": "tsc -p tsconfig.json --noEmit",

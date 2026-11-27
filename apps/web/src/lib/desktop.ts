@@ -33,6 +33,7 @@ export interface DesktopAppInfo {
   nodeVersion: string;
   platform: string;
   isDev: boolean;
+  defaultServerUrl?: string;
 }
 
 export interface WindowUIState {

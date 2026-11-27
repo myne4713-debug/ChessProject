@@ -1,6 +1,8 @@
 appId: com.onlinechess.desktop
 productName: Online Chess
 copyright: Copyright © 2026 Online Chess Contributors
+electronVersion: "35.7.5"
+npmRebuild: false
 directories:
   output: release
   buildResources: assets

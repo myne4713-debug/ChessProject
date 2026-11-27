@@ -10,3 +10,5 @@ skills
 *.log
 npm-debug.log*
 .coverage
+apps/desktop
+artifacts

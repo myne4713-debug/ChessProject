@@ -10,7 +10,8 @@ COPY tsconfig.base.json ./
 COPY packages/shared/package*.json ./packages/shared/
 COPY apps/server/package*.json ./apps/server/
 
-# Install dependencies across workspaces
+# Install dependencies across workspaces (skip Electron desktop binary inside Docker)
+ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
 RUN npm install
 
 # Copy source code

@@ -8,6 +8,7 @@ COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 COPY apps/web ./apps/web
 
+ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
 RUN npm install
 RUN npm --workspace=@online-chess/shared run build
 

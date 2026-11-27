@@ -45,4 +45,4 @@ apps/server/prisma/*.db-journal
 # Electron desktop build & packaging artifacts
 apps/desktop/renderer/
 apps/desktop/release/
-
+artifacts/

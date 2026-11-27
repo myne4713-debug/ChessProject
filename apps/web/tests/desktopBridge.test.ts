@@ -21,6 +21,7 @@ class LocalStorageMock {
 import {
   buildShareInviteLink,
   isElectronDesktop,
+  parseDesktopAuthCallback,
   resolveApiBaseUrl,
   resolveSocketBaseUrl,
   setStoredDesktopServerUrl,
@@ -59,5 +60,39 @@ describe('Web App: Electron Desktop Bridge Helpers', () => {
     setStoredDesktopServerUrl('https://arena.chess.dev///');
     expect(resolveApiBaseUrl()).toBe('https://arena.chess.dev/api/v1');
     expect(resolveSocketBaseUrl()).toBe('https://arena.chess.dev');
+  });
+
+  it('validates desktop OAuth loopback callbacks strictly and rejects external origins', () => {
+    const validState = 'a'.repeat(48);
+    expect(
+      parseDesktopAuthCallback(
+        `?desktopCallback=${encodeURIComponent('http://127.0.0.1:54321/callback')}&desktopState=${validState}`
+      )
+    ).toEqual({
+      callbackUrl: 'http://127.0.0.1:54321/callback',
+      state: validState,
+    });
+
+    // Reject external domains, HTTPS non-loopback, wrong paths, weak state
+    expect(
+      parseDesktopAuthCallback(
+        `?desktopCallback=${encodeURIComponent('https://evil.example/callback')}&desktopState=${validState}`
+      )
+    ).toBeNull();
+    expect(
+      parseDesktopAuthCallback(
+        `?desktopCallback=${encodeURIComponent('http://127.0.0.1:80/callback')}&desktopState=${validState}`
+      )
+    ).toBeNull();
+    expect(
+      parseDesktopAuthCallback(
+        `?desktopCallback=${encodeURIComponent('http://127.0.0.1:54321/other')}&desktopState=${validState}`
+      )
+    ).toBeNull();
+    expect(
+      parseDesktopAuthCallback(
+        `?desktopCallback=${encodeURIComponent('http://127.0.0.1:54321/callback')}&desktopState=short`
+      )
+    ).toBeNull();
   });
 });

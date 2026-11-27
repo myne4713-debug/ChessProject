@@ -59,6 +59,8 @@ export interface ElectronDesktopAPI {
   notify: (payload: DesktopNotificationPayload) => Promise<boolean>;
   requestAttention: () => void;
   openExternal: (url: string) => Promise<boolean>;
+  startGoogleAuth?: () => Promise<{ accessToken: string }>;
+  cancelGoogleAuth?: () => Promise<void>;
   onWindowStateChange: (listener: (state: WindowUIState) => void) => () => void;
   onNavigate: (listener: (route: string) => void) => () => void;
   onOpenSettings: (listener: () => void) => () => void;
@@ -160,4 +162,43 @@ export function applyDesktopTheme(theme: DesktopThemeMode): void {
     document.documentElement.removeAttribute('data-theme');
     document.documentElement.classList.remove('dark');
   }
+}
+
+export interface DesktopAuthCallbackParams {
+  callbackUrl: string;
+  state: string;
+}
+
+/**
+ * Validates `?desktopCallback=...&desktopState=...` strictly to loopback 127.0.0.1/localhost
+ * to prevent open-redirect vulnerabilities while brokering Google OAuth for the Electron app.
+ */
+export function parseDesktopAuthCallback(search: string): DesktopAuthCallbackParams | null {
+  if (!search) return null;
+  const params = new URLSearchParams(search);
+  const rawCallback = params.get('desktopCallback')?.trim() || '';
+  const state = params.get('desktopState')?.trim() || '';
+
+  if (!rawCallback || !/^[a-f0-9]{32,128}$/i.test(state)) {
+    return null;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(rawCallback);
+  } catch {
+    return null;
+  }
+
+  if (parsed.protocol !== 'http:') return null;
+  if (parsed.hostname !== '127.0.0.1' && parsed.hostname !== 'localhost') return null;
+  if (parsed.pathname !== '/callback') return null;
+
+  const port = Number(parsed.port);
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) return null;
+
+  return {
+    callbackUrl: `${parsed.origin}${parsed.pathname}`,
+    state,
+  };
 }

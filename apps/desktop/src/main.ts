@@ -12,6 +12,7 @@ import {
   shell,
 } from 'electron';
 import { DEEP_LINK_SCHEME, extractDeepLinkFromArgv, parseDeepLinkToRoute } from './deepLink';
+import { DesktopGoogleAuthBroker } from './googleAuth';
 import { checkServerHealth } from './healthCheck';
 import { buildApplicationMenu } from './menu';
 import { APP_ORIGIN, APP_SCHEME, registerAppProtocol } from './protocol';
@@ -55,6 +56,7 @@ const isDev = Boolean(devRendererUrl);
 let mainWindow: BrowserWindow | null = null;
 let settingsStore: DesktopSettingsStore | null = null;
 let trayManager: DesktopTrayManager | null = null;
+const googleAuthBroker = new DesktopGoogleAuthBroker();
 let isQuitting = false;
 let pendingDeepLinkRoute: string | null = extractDeepLinkFromArgv(process.argv);
 
@@ -433,6 +435,19 @@ function registerIpcHandlers(): void {
     await shell.openExternal(url);
     return true;
   });
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_GOOGLE_START, async () => {
+    const serverUrl = settingsStore!.get().serverUrl;
+    return googleAuthBroker.start({
+      serverUrl,
+      openBrowser: (authUrl) => shell.openExternal(authUrl),
+      onSuccessFocus: () => showAndFocusMainWindow(),
+    });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_GOOGLE_CANCEL, () => {
+    googleAuthBroker.cancel();
+  });
 }
 
 function registerDeepLinkProtocol(): void {
@@ -471,6 +486,7 @@ if (!gotSingleInstanceLock) {
 
   app.on('before-quit', () => {
     isQuitting = true;
+    googleAuthBroker.cancel('Ứng dụng đang đóng.');
     trayManager?.destroy();
   });
 

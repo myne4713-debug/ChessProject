@@ -6,9 +6,10 @@ import { loginSchema, LoginInput } from '@online-chess/shared';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import { reconnectSocketWithAuth } from '../../services/socket';
-import { Lock, User, Eye, EyeOff, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, AlertCircle, ShieldAlert, Monitor } from 'lucide-react';
 import { PieceSvg } from '../../components/chess/PieceSvg';
 import GoogleLoginButton from '../../components/auth/GoogleLoginButton';
+import { isElectronDesktop, parseDesktopAuthCallback } from '../../lib/desktop';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -18,6 +19,10 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [unverifiedEmail, setUnverifiedEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const desktopAuthCallback = isElectronDesktop()
+    ? null
+    : parseDesktopAuthCallback(location.search);
 
   const rawFrom = (location.state as { from?: string } | null)?.from;
   const redirectPath =
@@ -75,6 +80,23 @@ export default function LoginPage() {
             </p>
           </div>
         </div>
+
+        {desktopAuthCallback && (
+          <div
+            role="status"
+            className="mb-5 p-3.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-900 text-xs sm:text-sm flex items-start gap-2.5"
+          >
+            <Monitor className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="font-semibold text-slate-900">
+                Xác thực Google cho Online Chess Desktop
+              </p>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Nhấn nút Đăng nhập bằng tài khoản Google bên dưới để hoàn tất và tự động quay lại ứng dụng máy tính.
+              </p>
+            </div>
+          </div>
+        )}
 
         {errorMessage && (
           <div

@@ -26,6 +26,8 @@ const CHANNELS = {
   NAVIGATE: 'desktop:navigate',
   OPEN_SETTINGS: 'desktop:open-settings',
   TOGGLE_THEME: 'desktop:toggle-theme',
+  AUTH_GOOGLE_START: 'desktop:auth:google-start',
+  AUTH_GOOGLE_CANCEL: 'desktop:auth:google-cancel',
 } as const;
 
 function subscribe<T>(channel: string, listener: (payload: T) => void): () => void {
@@ -77,6 +79,11 @@ const electronAPI = {
 
   openExternal: (url: string): Promise<boolean> =>
     ipcRenderer.invoke(CHANNELS.OPEN_EXTERNAL, url),
+
+  startGoogleAuth: (): Promise<{ accessToken: string }> =>
+    ipcRenderer.invoke(CHANNELS.AUTH_GOOGLE_START),
+
+  cancelGoogleAuth: (): Promise<void> => ipcRenderer.invoke(CHANNELS.AUTH_GOOGLE_CANCEL),
 
   onWindowStateChange: (listener: (state: WindowUIState) => void) =>
     subscribe<WindowUIState>(CHANNELS.WINDOW_STATE_CHANGED, listener),

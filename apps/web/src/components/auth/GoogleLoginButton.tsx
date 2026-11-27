@@ -1,10 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import { reconnectSocketWithAuth } from '../../services/socket';
 import { useDialogFocusTrap } from '../../hooks/useDialogFocusTrap';
-import { KeyRound, X, AlertCircle, Info } from 'lucide-react';
+import {
+  getDesktopApi,
+  isElectronDesktop,
+  parseDesktopAuthCallback,
+} from '../../lib/desktop';
+import { KeyRound, X, AlertCircle, Info, ExternalLink } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -25,8 +30,13 @@ export default function GoogleLoginButton({
   className = '',
 }: GoogleLoginButtonProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const inDesktop = isElectronDesktop();
+  const desktopCallback = inDesktop ? null : parseDesktopAuthCallback(location.search);
+
   const [isLoading, setIsLoading] = useState(false);
+  const [waitingBrowser, setWaitingBrowser] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [authFeedback, setAuthFeedback] = useState<{
     type: 'error' | 'info';
@@ -49,8 +59,10 @@ export default function GoogleLoginButton({
 
   const tokenClientRef = useRef<any>(null);
 
-  // Load Google Identity Services SDK
+  // Load Google Identity Services SDK only in browser context (Electron uses system browser broker)
   useEffect(() => {
+    if (inDesktop) return;
+
     const scriptId = 'google-gsi-client';
     if (!document.getElementById(scriptId)) {
       const script = document.createElement('script');
@@ -87,9 +99,27 @@ export default function GoogleLoginButton({
         console.error('Failed to init Google OAuth client', err);
       }
     }
-  }, [clientId]);
+  }, [clientId, inDesktop]);
+
+  // Cancel any pending system-browser auth if component unmounts
+  useEffect(() => {
+    return () => {
+      if (inDesktop) {
+        void getDesktopApi()?.cancelGoogleAuth?.();
+      }
+    };
+  }, [inDesktop]);
 
   const handleAccessToken = async (accessToken: string) => {
+    // If opened in browser on behalf of Online Chess Desktop, hand token back to loopback callback
+    if (desktopCallback) {
+      const redirectUrl = `${desktopCallback.callbackUrl}?state=${encodeURIComponent(
+        desktopCallback.state
+      )}&googleAccessToken=${encodeURIComponent(accessToken)}`;
+      window.location.assign(redirectUrl);
+      return;
+    }
+
     setAuthFeedback(null);
     setIsLoading(true);
     try {
@@ -115,7 +145,57 @@ export default function GoogleLoginButton({
     }
   };
 
+  const handleDesktopGoogleLogin = async () => {
+    const desktopApi = getDesktopApi();
+    if (!desktopApi?.startGoogleAuth) {
+      setAuthFeedback({
+        type: 'error',
+        message: 'Phiên bản Desktop hiện tại chưa hỗ trợ đăng nhập Google qua trình duyệt ngoài.',
+      });
+      return;
+    }
+
+    setAuthFeedback({
+      type: 'info',
+      message:
+        'Đã mở trình duyệt hệ thống để xác thực Google. Hoàn tất trên trình duyệt để tự động quay lại ứng dụng.',
+    });
+    setIsLoading(true);
+    setWaitingBrowser(true);
+
+    try {
+      const result = await desktopApi.startGoogleAuth();
+      setWaitingBrowser(false);
+      if (result?.accessToken) {
+        await handleAccessToken(result.accessToken);
+      }
+    } catch (err: unknown) {
+      const rawMessage =
+        err instanceof Error
+          ? err.message.replace(/^Error invoking remote method '[^']+': Error: /, '')
+          : 'Không thể hoàn tất đăng nhập Google trên trình duyệt.';
+      setAuthFeedback({
+        type: 'error',
+        message: rawMessage,
+      });
+    } finally {
+      setWaitingBrowser(false);
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancelDesktopAuth = () => {
+    void getDesktopApi()?.cancelGoogleAuth?.();
+    setWaitingBrowser(false);
+    setIsLoading(false);
+  };
+
   const handleClick = () => {
+    if (inDesktop) {
+      void handleDesktopGoogleLogin();
+      return;
+    }
+
     setAuthFeedback(null);
     const activeClientId = clientId || DEFAULT_GOOGLE_CLIENT_ID;
 
@@ -191,7 +271,7 @@ export default function GoogleLoginButton({
           type="button"
           onClick={handleClick}
           disabled={isLoading}
-          className={`w-full py-2.5 min-h-[44px] px-4 bg-white hover:bg-slate-50/90 active:scale-[0.98] border border-slate-200/90 text-slate-700 font-semibold rounded-xl text-xs sm:text-sm shadow-subtle hover:border-slate-300 transition-colors duration-150 flex items-center justify-center gap-3 relative overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 ${className}`}
+          className={`w-full py-2.5 min-h-[44px] px-4 bg-white hover:bg-slate-50/90 active:scale-[0.98] border border-slate-200/90 text-slate-700 font-semibold rounded-xl text-xs sm:text-sm shadow-subtle hover:border-slate-300 transition-[background-color,border-color,transform] duration-150 ease-out flex items-center justify-center gap-3 relative overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 ${className}`}
         >
           {isLoading ? (
             <div className="w-4 h-4 border-2 border-sky-600 border-t-transparent rounded-full animate-spin" />
@@ -217,6 +297,9 @@ export default function GoogleLoginButton({
                 />
               </svg>
               <span>{text}</span>
+              {inDesktop && (
+                <ExternalLink className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" aria-hidden="true" />
+              )}
             </>
           )}
         </button>
@@ -234,10 +317,21 @@ export default function GoogleLoginButton({
             <div
               role="status"
               aria-live="polite"
-              className="mt-2 p-2.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-800 text-xs font-medium flex items-start gap-2 animate-in fade-in duration-150"
+              className="mt-2 p-2.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-800 text-xs font-medium flex items-start justify-between gap-2 animate-in fade-in duration-150"
             >
-              <Info className="w-4 h-4 shrink-0 mt-0.5 text-sky-600" aria-hidden="true" />
-              <span>{authFeedback.message}</span>
+              <div className="flex items-start gap-2 min-w-0">
+                <Info className="w-4 h-4 shrink-0 mt-0.5 text-sky-600" aria-hidden="true" />
+                <span>{authFeedback.message}</span>
+              </div>
+              {waitingBrowser && (
+                <button
+                  type="button"
+                  onClick={handleCancelDesktopAuth}
+                  className="shrink-0 px-2.5 py-1 rounded-lg bg-white border border-sky-200 text-sky-800 hover:bg-sky-100 font-semibold text-xs transition-colors"
+                >
+                  Hủy
+                </button>
+              )}
             </div>
           ))}
       </div>

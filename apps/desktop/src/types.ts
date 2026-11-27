@@ -68,4 +68,6 @@ export const IPC_CHANNELS = {
   NAVIGATE: 'desktop:navigate',
   OPEN_SETTINGS: 'desktop:open-settings',
   TOGGLE_THEME: 'desktop:toggle-theme',
+  AUTH_GOOGLE_START: 'desktop:auth:google-start',
+  AUTH_GOOGLE_CANCEL: 'desktop:auth:google-cancel',
 } as const;
